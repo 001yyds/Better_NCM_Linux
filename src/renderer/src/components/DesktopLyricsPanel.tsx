@@ -234,7 +234,7 @@ export function DesktopLyricsPanel({
             <div className="mt-4 overflow-hidden rounded-[20px] border border-white/25 bg-[radial-gradient(120%_120%_at_20%_10%,#414a63_0%,#181b26_55%,#0a0b10_100%)] px-5 py-7">
               <div className="relative mx-auto w-fit max-w-full">
                 <div
-                  className="relative"
+                  className="relative text-center"
                   style={{
                     background: background
                       ? rgba(backgroundColor, Math.min(100, Math.max(0, opacity)) / 100)

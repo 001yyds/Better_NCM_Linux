@@ -219,14 +219,21 @@ class ScreenLayer:
         self.handle.connect("draw", self.draw_handle)
         self.fixed.put(self.handle, 0, 0)
 
+        # 两行歌词共享同一个水平中心轴：垂直 GtkBox 会把 box 的最大自然宽度
+        # 分配给每个子控件，xalign=0.5 让每行在各自拿到的宽度里居中，
+        # 短行因此向长行中间收拢（不能用前导空格模拟）。
         self.current_label = Gtk.Label(label="")
         self.current_label.set_name("lyric")
-        self.current_label.set_xalign(0.0)
+        self.current_label.set_xalign(0.5)
+        self.current_label.set_hexpand(True)
+        self.current_label.set_justify(Gtk.Justification.CENTER)
         self.secondary_label = Gtk.Label(label="")
         self.secondary_label.set_name("secondary")
-        self.secondary_label.set_xalign(0.0)
-        self.box.pack_start(self.current_label, False, False, 0)
-        self.box.pack_start(self.secondary_label, False, False, 0)
+        self.secondary_label.set_xalign(0.5)
+        self.secondary_label.set_hexpand(True)
+        self.secondary_label.set_justify(Gtk.Justification.CENTER)
+        self.box.pack_start(self.current_label, True, True, 0)
+        self.box.pack_start(self.secondary_label, True, True, 0)
 
         # 手势挂在 window 上：window 永远不动，偏移量就是真实位移
         self.gesture = Gtk.GestureDrag.new(self.window)
