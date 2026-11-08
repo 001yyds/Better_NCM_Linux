@@ -133,19 +133,34 @@ def normalize_config(config):
     except (TypeError, ValueError):
         config["background_opacity"] = 42
     config["locked"] = bool(config.get("locked", False))
+    config["position_anchor"] = (
+        config.get("position_anchor")
+        if config.get("position_anchor") in ("legacy", "center")
+        else "center"
+    )
     return config
 
 
 def load_config():
     config = dict(DEFAULT_CONFIG)
+    stored = {}
+    config_exists = False
     try:
         with open(CONFIG_PATH, "r", encoding="utf-8") as handle:
             stored = json.load(handle)
+        if not isinstance(stored, dict):
+            stored = {}
+        config_exists = True
         for key in config:
             if key in stored:
                 config[key] = stored[key]
     except Exception:
         pass
+    # 旧版本把 x 保存成文字左边界；新版本保存字幕中心点。
+    # 新安装没有配置文件时直接使用中心点语义，已有配置在第一次有歌词时迁移。
+    config["position_anchor"] = stored.get(
+        "position_anchor", "legacy" if config_exists else "center"
+    )
     return normalize_config(config)
 
 
@@ -221,7 +236,8 @@ class ScreenLayer:
 
         # 两行歌词共享同一个水平中心轴：垂直 GtkBox 会把 box 的最大自然宽度
         # 分配给每个子控件，xalign=0.5 让每行在各自拿到的宽度里居中，
-        # 短行因此向长行中间收拢（不能用前导空格模拟）。
+        # 短行因此向长行中间收拢（不能用前导空格模拟）。字幕框本身还会
+        # 以保存的中心点为锚，文字变长或变短时向左右对称展开。
         self.current_label = Gtk.Label(label="")
         self.current_label.set_name("lyric")
         self.current_label.set_xalign(0.5)
@@ -256,6 +272,19 @@ class ScreenLayer:
         self.current_label.set_text(current)
         self.secondary_label.set_text(secondary)
         self.secondary_label.set_visible(bool(secondary))
+
+        # 第一次拿到歌词时把旧版左边界转换成当前字幕中心点，保持升级前的位置。
+        if self.overlay.position_anchor == "legacy" and (current or secondary):
+            width, _height = self.hit_size()
+            self.overlay.pos_x += width // 2
+            self.overlay.position_anchor = "center"
+            self.overlay.config["position_anchor"] = "center"
+            self.overlay.pos_x, self.overlay.pos_y = self.overlay.clamp_to_layer(
+                self.overlay.layer, self.overlay.pos_x, self.overlay.pos_y
+            )
+            self.overlay.config["x"] = self.overlay.pos_x
+            self.overlay.config["y"] = self.overlay.pos_y
+            save_config(self.overlay.config)
 
     def hit_size(self):
         """文字本身的尺寸（不含灰色框的内边距）。
@@ -335,32 +364,34 @@ class ScreenLayer:
         cr.arc(x + radius, y + height - radius, radius, math.pi * 0.5, math.pi)
         cr.close_path()
 
-    def handle_center(self, x, y):
-        """手柄圆心：左边缘对齐字幕左边缘（压在字幕上），垂直居中，并夹在屏幕内。"""
-        _width, height = self.hit_size()
+    def handle_center(self, center_x, y):
+        """手柄圆心：压在字幕左边缘，字幕位置本身用中心点表示。"""
+        width, height = self.hit_size()
         _mx, _my, monitor_w, monitor_h = self.geometry()
         half = HANDLE_SIZE // 2
-        center_x = int(x) + half
-        center_y = int(y) + height // 2
-        center_x = min(max(center_x, half), max(half, monitor_w - half))
-        center_y = min(max(center_y, half), max(half, monitor_h - half))
-        return center_x, center_y
+        left = int(center_x) - width // 2
+        handle_x = left + half
+        handle_y = int(y) + height // 2
+        handle_x = min(max(handle_x, half), max(half, monitor_w - half))
+        handle_y = min(max(handle_y, half), max(half, monitor_h - half))
+        return handle_x, handle_y
 
-    def handle_rect(self, x, y):
-        center_x, center_y = self.handle_center(x, y)
+    def handle_rect(self, center_x, y):
+        handle_x, handle_y = self.handle_center(center_x, y)
         half = HANDLE_HIT // 2
-        return center_x - half, center_y - half, HANDLE_HIT, HANDLE_HIT
+        return handle_x - half, handle_y - half, HANDLE_HIT, HANDLE_HIT
 
-    def place(self, x, y):
-        x, y = int(x), int(y)
-        # 文字左上角保持为 (x, y)，灰色框向外扩，手柄落在文字中心
+    def place(self, center_x, y):
+        center_x, y = int(center_x), int(y)
+        # x 保存为字幕中心点；实际左边界随自然宽度变化向两侧对称展开。
         width, height = self.hit_size()
+        left = center_x - width // 2
         self.frame.set_size_request(width + FRAME_PAD * 2, height + FRAME_PAD * 2)
-        self.fixed.move(self.frame, x - FRAME_PAD, y - FRAME_PAD)
-        self.fixed.move(self.box, x, y)
-        center_x, center_y = self.handle_center(x, y)
+        self.fixed.move(self.frame, left - FRAME_PAD, y - FRAME_PAD)
+        self.fixed.move(self.box, left, y)
+        handle_x, handle_y = self.handle_center(center_x, y)
         half = HANDLE_SIZE // 2
-        self.fixed.move(self.handle, center_x - half, center_y - half)
+        self.fixed.move(self.handle, handle_x - half, handle_y - half)
 
     # ---------- 拖动 ----------
 
@@ -400,6 +431,7 @@ class Overlay:
         self.drag_origin = None
         self.dragging = False
         self.drag_layer = None
+        self.position_anchor = self.config.get("position_anchor", "center")
 
         self.provider = Gtk.CssProvider()
         Gtk.StyleContext.add_provider_for_screen(
@@ -415,7 +447,8 @@ class Overlay:
 
         saved = int(self.config.get("monitor", 0))
         self.layer = self.layers[saved] if 0 <= saved < len(self.layers) else self.layers[0]
-        # 显示器数量或排列变了时，旧坐标可能落在屏幕外
+        # 显示器数量或排列变了时，旧坐标可能落在屏幕外。
+        # 旧配置仍按左边界语义先钳制，拿到第一条歌词后再迁移到中心点。
         self.pos_x, self.pos_y = self.clamp_to_layer(self.layer, self.pos_x, self.pos_y)
         self.layer.place(self.pos_x, self.pos_y)
         self.apply_visibility()
@@ -495,16 +528,30 @@ class Overlay:
         self.config["x"] = self.pos_x
         self.config["y"] = self.pos_y
         self.config["monitor"] = self.layer.index
+        self.config["position_anchor"] = "center"
         save_config(self.config)
         self.update_input_regions()
         # 松手后 GTK 可能还会重排一次，补一次刷新，保证新屏上的文字立刻能抓住
         GLib.idle_add(self.update_input_regions)
 
     def clamp_to_layer(self, layer, x, y):
-        _ox, _oy, width, height = layer.geometry()
-        max_x = max(0, width - MIN_VISIBLE_WIDTH)
-        max_y = max(0, height - MIN_VISIBLE_HEIGHT)
-        return max(0, min(int(x), max_x)), max(0, min(int(y), max_y))
+        _ox, _oy, monitor_w, monitor_h = layer.geometry()
+        if self.position_anchor == "legacy":
+            # 兼容迁移前的配置：旧 x 是文字左边界。
+            max_x = max(0, monitor_w - MIN_VISIBLE_WIDTH)
+            max_y = max(0, monitor_h - MIN_VISIBLE_HEIGHT)
+            return max(0, min(int(x), max_x)), max(0, min(int(y), max_y))
+
+        # 新 x 是字幕中心点。左边界仍至少保持在屏幕内，右边至少保留
+        # MIN_VISIBLE_WIDTH 像素可抓住手柄；歌词宽度变化不会改变中心点。
+        text_width, _text_height = layer.hit_size()
+        half_width = text_width // 2
+        min_x = half_width
+        max_x = monitor_w - MIN_VISIBLE_WIDTH + half_width
+        if max_x < min_x:
+            min_x = max_x = monitor_w // 2
+        max_y = max(0, monitor_h - MIN_VISIBLE_HEIGHT)
+        return max(min_x, min(int(x), max_x)), max(0, min(int(y), max_y))
 
     def layer_at(self, global_x, global_y):
         """返回全局坐标所在的显示器；落在屏幕之间的空隙时取最近的一块。"""
@@ -535,24 +582,12 @@ class Overlay:
 
     def move_global(self, global_x, global_y):
         target = self.layer_at(global_x, global_y)
-        target_x, target_y, target_w, target_h = target.geometry()
-        local_x = global_x - target_x
-        local_y = global_y - target_y
-        if 0 <= local_x < target_w and 0 <= local_y < target_h:
-            # 字幕落在某块屏幕内就严格跟随指针；只有整体布局的外边缘才限制最小可见，
-            # 屏与屏之间不钳制，跨屏时才不会在边界处跳一下
-            _left, _top, right, bottom = self.layout_bounds()
-            global_x = min(global_x, right - MIN_VISIBLE_WIDTH)
-            global_y = min(global_y, bottom - MIN_VISIBLE_HEIGHT)
-            local_x = max(0, global_x - target_x)
-            local_y = max(0, global_y - target_y)
-        else:
-            local_x, local_y = self.clamp_to_layer(target, local_x, local_y)
+        target_x, target_y, _target_w, _target_h = target.geometry()
         if target is not self.layer:
             previous = self.layer
             self.layer = target
-            # 只换文字与样式，不动控件可见性：拖动中隐藏发起手势那块窗口的子控件会让
-            # GTK 结束这次手势，跨屏后指针位移就收不到了。先画新屏再清旧屏，减少闪烁。
+            # 先让目标层拿到当前歌词，再按目标层的真实宽度钳制中心点。
+            # 控件仍保持可见，避免清空发起手势的窗口导致跨屏手势中断。
             target.set_text(self.text_current, self.text_secondary)
             previous.set_text("", "")
             background = bool(self.config.get("background", True))
@@ -560,6 +595,12 @@ class Overlay:
             target.set_handle_visible(self.has_text() and not self.locked)
             previous.set_frame_visible(False)
             previous.set_handle_visible(False)
+
+        # 拖动坐标表示字幕中心点；每块屏幕都使用同一套中心点边界，
+        # 这样跨屏时不会因为歌词宽度变化而重新从左边界展开。
+        local_x = global_x - target_x
+        local_y = global_y - target_y
+        local_x, local_y = self.clamp_to_layer(target, local_x, local_y)
         self.pos_x, self.pos_y = local_x, local_y
         target.place(local_x, local_y)
         # 拖动中不要改输入区域：清空发起手势那块窗口的 input region 会让合成器

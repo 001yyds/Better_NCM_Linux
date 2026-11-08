@@ -32,7 +32,7 @@ pnpm exec electron-builder --linux AppImage deb   # AppImage + deb
 makepkg -D build/arch -f --noconfirm              # Arch 包
 ```
 
-构建产物按版本归档在 `release/<version>/`（例如 `release/1.9.1/`），`release/linux-unpacked/` 是打包中间产物。
+构建产物按版本归档在 `release/<version>/`（例如 `release/1.9.2/`），`release/linux-unpacked/` 是打包中间产物。
 
 发版流程与自检清单见 [`CLAUDE.md`](./CLAUDE.md)。
 
@@ -43,10 +43,10 @@ makepkg -D build/arch -f --noconfirm              # Arch 包
 betterncm          # 或从应用菜单启动
 ```
 
-也可以直接运行 `release/1.9.1/BetterNCM-1.9.1-x86_64.AppImage`。Arch 上如果提示缺少 FUSE，可安装 `fuse2`，或：
+也可以直接运行 `release/1.9.2/BetterNCM-1.9.2-x86_64.AppImage`。Arch 上如果提示缺少 FUSE，可安装 `fuse2`，或：
 
 ```bash
-./BetterNCM-1.9.1-x86_64.AppImage --appimage-extract-and-run
+./BetterNCM-1.9.2-x86_64.AppImage --appimage-extract-and-run
 ```
 
 桌面歌词依赖系统的 GTK3 与 layer-shell（Arch：`sudo pacman -S gtk3 python-gobject gtk-layer-shell`）。
@@ -55,15 +55,15 @@ betterncm          # 或从应用菜单启动
 
 | 发行版 | 文件 | 安装 |
 | --- | --- | --- |
-| Arch Linux | `betterncm-1.9.1-1-x86_64.pkg.tar.zst` | `sudo pacman -U betterncm-1.9.1-1-x86_64.pkg.tar.zst` |
-| Debian / Ubuntu | `BetterNCM-1.9.1-amd64.deb` | `sudo apt install ./BetterNCM-1.9.1-amd64.deb` |
-| 通用便携 | `BetterNCM-1.9.1-x86_64.AppImage` | `chmod +x` 后直接运行 |
+| Arch Linux | `betterncm-1.9.2-1-x86_64.pkg.tar.zst` | `sudo pacman -U betterncm-1.9.2-1-x86_64.pkg.tar.zst` |
+| Debian / Ubuntu | `BetterNCM-1.9.2-amd64.deb` | `sudo apt install ./BetterNCM-1.9.2-amd64.deb` |
+| 通用便携 | `BetterNCM-1.9.2-x86_64.AppImage` | `chmod +x` 后直接运行 |
 
 下载地址：[Releases](https://github.com/001yyds/Better_NCM_Linux/releases/latest)
 
 ## Android
 
-APK 下载：[BetterNCM-1.9.1-android.apk](https://github.com/001yyds/Better_NCM_Linux/releases/download/v1.9.1/BetterNCM-1.9.1-android.apk)
+APK 下载：[BetterNCM-1.9.2-android.apk](https://github.com/001yyds/Better_NCM_Linux/releases/download/v1.9.2/BetterNCM-1.9.2-android.apk)
 
 - 三种登录方式：扫码、手机号验证码、内嵌官方网页登录（可完成滑块验证）
 - 歌单、每日推荐、搜索、歌词、播放队列
@@ -109,7 +109,7 @@ mv ~/Music/JanMusic ~/Music/BetterNCM
 - 解锁时字幕左侧显示圆形拖动手柄，按住即可拖动，位置自动保存，可连续拖过屏幕边界
 - 可调字体颜色、字号、文字描边，以及背景开关、背景颜色与透明度；外观页内有实时预览
 - 点「锁定」后手柄消失、整层点击穿透，不挡其他窗口操作，背景与文字样式保持不变；再点「解锁」恢复
-- 显示当前行 + 翻译（无翻译时显示下一行），两行按各自文字宽度居中、共享同一个水平中心轴
+- 显示当前行 + 翻译（无翻译时显示下一行），两行按各自文字宽度居中、共享同一个水平中心轴；歌词变长或变短时以固定中心点向左右对称展开
 - 播放暂停时自动变淡
 - 基于 Wayland 的 layer-shell：niri、KDE Plasma 6（Wayland）可用；X11 会话暂不支持
 
