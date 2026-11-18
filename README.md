@@ -8,11 +8,17 @@
 - 桌面歌词（仅桌面端）：Wayland 下用 wlr-layer-shell 把歌词浮在桌面最上层，可拖动、可在多块屏幕之间拖动、可锁定穿透、支持翻译行，当前行与翻译行共享同一水平中心轴，短行向长行中间收拢；字体颜色、描边、背景颜色与透明度可调，设置内实时预览
 - 桌面端扫码登录；手机端支持扫码、手机号验证码，以及内嵌官方网页登录（风控滑块在网页内完成）
 - 歌单与「我喜欢的音乐」自动同步，收藏页可直接打开歌单
-- 每日推荐、推荐歌单、新歌速递、排行榜
+- 每日推荐、推荐歌单、新歌速递、排行榜（官方榜 / 精选榜 / 曲风榜 / 全球榜分组）
+- 歌手详情（热门作品、专辑、MV、简介、相似歌手、关注）、专辑详情、MV 播放与下载
+- 用户主页（歌单、关注、粉丝）、我的收藏（专辑 / 关注歌手 / 收藏 MV）、播放记录
+- 歌单广场（分类 + 精品歌单）、私人漫游（自动续歌、喜欢 / 不感兴趣）
 - 歌单详情、单曲播放、播放队列、顺序/单曲/列表循环/随机
+- 歌单管理：新建、改名、简介、标签、收藏 / 取消收藏、添加 / 移除歌曲、删除
 - 全屏播放页：缓慢旋转封面、动态毛玻璃背景、单行歌词
-- 逐行滚动歌词页，支持翻译、点击跳转、自动居中高亮
-- 全局搜索：单曲 / 歌单 / 歌手
+- 逐行滚动歌词页，支持翻译、逐字（卡拉 OK）高亮、点击跳转、自动居中高亮
+- 歌词时间轴偏移、播放速度（0.75×–2×）、定时停止（15–90 分钟）
+- 全局搜索：单曲 / 歌词 / 歌手 / 专辑 / 歌单 / MV / 用户，支持热门搜索与搜索建议
+- 首页官方 Banner 轮播与 MV 精选
 - 音质切换（标准 / 较高 / 极高 / 无损 / Hi-Res），会员歌曲自动降级并标记「试听」
 - 播放 15 秒后自动把整首补全到本地缓存，下次直接离线播放
 - 单曲下载与歌单「全部下载」，下载列表显示进度与结果；已下载歌曲可删除并同时清理本地文件，同一首歌不会重复下载
@@ -20,6 +26,14 @@
 - 单曲下载到 `~/Music/BetterNCM`，下载记录可查
 - 播放队列、音质、音量、播放模式跨重启记忆
 - 自定义无边框窗口、窗口按钮、快捷键、媒体键（桌面环境支持时）
+
+## 1.10.0 更新
+
+- 新增歌手、专辑、MV、用户、排行榜、歌单广场、私人漫游、我的收藏、播放记录页面
+- 搜索扩展歌词、专辑、MV、用户，加入热门搜索与输入建议
+- 播放页支持 yrc 逐字歌词高亮，以及歌词偏移、播放速度、定时停止
+- 歌单支持新建、编辑、删除、收藏与歌曲增删；MV 支持清晰度切换、收藏和下载
+- 首页加入官方 Banner 和 MV 精选，手机端全屏播放与歌词同步适配
 
 ## 运行
 
@@ -32,7 +46,7 @@ pnpm exec electron-builder --linux AppImage deb   # AppImage + deb
 makepkg -D build/arch -f --noconfirm              # Arch 包
 ```
 
-构建产物按版本归档在 `release/<version>/`（例如 `release/1.9.2/`），`release/linux-unpacked/` 是打包中间产物。
+构建产物按版本归档在 `release/<version>/`（例如 `release/1.10.0/`），`release/linux-unpacked/` 是打包中间产物。
 
 发版流程与自检清单见 [`CLAUDE.md`](./CLAUDE.md)。
 
@@ -43,10 +57,10 @@ makepkg -D build/arch -f --noconfirm              # Arch 包
 betterncm          # 或从应用菜单启动
 ```
 
-也可以直接运行 `release/1.9.2/BetterNCM-1.9.2-x86_64.AppImage`。Arch 上如果提示缺少 FUSE，可安装 `fuse2`，或：
+也可以直接运行 `release/1.10.0/BetterNCM-1.10.0-x86_64.AppImage`。Arch 上如果提示缺少 FUSE，可安装 `fuse2`，或：
 
 ```bash
-./BetterNCM-1.9.2-x86_64.AppImage --appimage-extract-and-run
+./BetterNCM-1.10.0-x86_64.AppImage --appimage-extract-and-run
 ```
 
 桌面歌词依赖系统的 GTK3 与 layer-shell（Arch：`sudo pacman -S gtk3 python-gobject gtk-layer-shell`）。
@@ -55,15 +69,15 @@ betterncm          # 或从应用菜单启动
 
 | 发行版 | 文件 | 安装 |
 | --- | --- | --- |
-| Arch Linux | `betterncm-1.9.2-1-x86_64.pkg.tar.zst` | `sudo pacman -U betterncm-1.9.2-1-x86_64.pkg.tar.zst` |
-| Debian / Ubuntu | `BetterNCM-1.9.2-amd64.deb` | `sudo apt install ./BetterNCM-1.9.2-amd64.deb` |
-| 通用便携 | `BetterNCM-1.9.2-x86_64.AppImage` | `chmod +x` 后直接运行 |
+| Arch Linux | `betterncm-1.10.0-1-x86_64.pkg.tar.zst` | `sudo pacman -U betterncm-1.10.0-1-x86_64.pkg.tar.zst` |
+| Debian / Ubuntu | `BetterNCM-1.10.0-amd64.deb` | `sudo apt install ./BetterNCM-1.10.0-amd64.deb` |
+| 通用便携 | `BetterNCM-1.10.0-x86_64.AppImage` | `chmod +x` 后直接运行 |
 
 下载地址：[Releases](https://github.com/001yyds/Better_NCM_Linux/releases/latest)
 
 ## Android
 
-APK 下载：[BetterNCM-1.9.2-android.apk](https://github.com/001yyds/Better_NCM_Linux/releases/download/v1.9.2/BetterNCM-1.9.2-android.apk)
+APK 下载：[BetterNCM-1.10.0-android.apk](https://github.com/001yyds/Better_NCM_Linux/releases/download/v1.10.0/BetterNCM-1.10.0-android.apk)
 
 - 三种登录方式：扫码、手机号验证码、内嵌官方网页登录（可完成滑块验证）
 - 歌单、每日推荐、搜索、歌词、播放队列
