@@ -209,7 +209,7 @@ export function ArtistPage({
               <h1 className="truncate text-[24px] font-semibold leading-tight tracking-[-0.02em] text-black/90 sm:text-[30px]">
                 {name}
               </h1>
-              {artist.followed && <UserCheck size={16} className="shrink-0 text-brand" />}
+              {followed && <UserCheck size={16} className="shrink-0 text-brand" />}
             </div>
             {artist.alias?.length ? (
               <p className="mt-1 truncate text-[11.5px] text-black/40">{artist.alias.join(' / ')}</p>

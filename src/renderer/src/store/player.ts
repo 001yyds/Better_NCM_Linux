@@ -283,6 +283,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         void start(current, true)
         return
       }
+      audio.playbackRate = get().rate
       void audio.play().catch(() => toast('无法播放当前音源', 'error'))
     } else {
       audio.pause()
