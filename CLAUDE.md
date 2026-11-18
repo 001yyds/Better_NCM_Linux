@@ -135,4 +135,7 @@ android/           Capacitor 工程（含 WebLoginPlugin 原生插件）
 - **Gradle 会缓存 JDK 探测结果**：装完 JDK 仍报 `JAVA_COMPILER` 时，先 `./android/gradlew -p android --stop` 再构建。
 - **切页动画不要动 opacity**：包裹层 `opacity < 1` 会成为 backdrop root，里面的 `backdrop-filter` 只采样容器自身，玻璃会退化成半透明白。
 - **WebView Cookie 删除**：带 `Domain` 的 Cookie 用逐条 `Max-Age=0` 删不掉，要 `removeAllCookies` 后复核。
+- **官方 `/api/artist/sub` 不能走 weapi**：`/weapi/artist/sub` 永远返回「参数错误」，带登录 Cookie 直接 `GET https://music.163.com/api/artist/sub?artistId=...&csrf_token=...` 才成功；`artist/unsub` 走 weapi 正常。`mv/sub` 两条通道都不可用，MV 收藏入口已移除。
+- **官方 /api GET 不要带 os/appver**：给 weapi 追加的 `os=pc`、`appver=8.10.40` 会让 `/api/artist/sub` 重新变成参数错误，GET 通道要用原始 Cookie。
+- **`pc/recent/listen/list` 可能返回空**：部分账号最近播放为空，但 `v1/play/record` 仍可用；「播放记录」页因此提供本周最热兜底入口。
 - **`.gitignore` 已忽略** `out/`、`release/`、`android/app/build/`、`.playwright-mcp/`。
