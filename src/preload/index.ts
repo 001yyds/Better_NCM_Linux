@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { HighQualityParams, MVQuery, SearchType } from '../shared/api'
 import type {
   AppInfo,
   Comment,
@@ -25,10 +26,54 @@ const api = {
     logout: () => invoke('auth:logout')
   },
   user: {
-    playlists: (uid: number) => invoke('user:playlists', uid)
+    playlists: (uid: number) => invoke('user:playlists', uid),
+    detail: (uid: number) => invoke('user:detail', uid),
+    follows: (uid: number, offset = 0, limit = 30) =>
+      invoke('user:follows', uid, offset, limit),
+    followers: (uid: number, offset = 0, limit = 30) =>
+      invoke('user:followers', uid, offset, limit),
+    playRecord: (uid: number, type: 0 | 1 = 1) => invoke('user:play-record', uid, type),
+    recent: (limit = 100) => invoke('user:recent', limit)
   },
   playlist: {
-    detail: (id: number) => invoke('playlist:detail', id)
+    detail: (id: number) => invoke('playlist:detail', id),
+    catalogue: () => invoke('playlist:catalogue'),
+    highquality: (params: HighQualityParams = {}) => invoke('playlist:highquality', params),
+    subscribe: (id: number, subscribed: boolean) =>
+      invoke('playlist:subscribe', id, subscribed),
+    create: (name: string) => invoke('playlist:create', name),
+    rename: (id: number, name: string) => invoke('playlist:rename', id, name),
+    updateDesc: (id: number, description: string) =>
+      invoke('playlist:update-desc', id, description),
+    updateTags: (id: number, tags: string) => invoke('playlist:update-tags', id, tags),
+    addTracks: (id: number, trackIds: number[]) => invoke('playlist:add-tracks', id, trackIds),
+    removeTracks: (id: number, trackIds: number[]) =>
+      invoke('playlist:remove-tracks', id, trackIds)
+  },
+  artist: {
+    detail: (id: number) => invoke('artist:detail', id),
+    albums: (id: number, offset = 0, limit = 30) => invoke('artist:albums', id, offset, limit),
+    mvs: (id: number, offset = 0, limit = 20) => invoke('artist:mvs', id, offset, limit),
+    introduction: (id: number) => invoke('artist:introduction', id),
+    subscribe: (id: number, subscribed: boolean) => invoke('artist:subscribe', id, subscribed),
+    sublist: (offset = 0, limit = 50) => invoke('artist:sublist', offset, limit),
+    similar: (id: number) => invoke('artist:similar', id)
+  },
+  album: {
+    detail: (id: number) => invoke('album:detail', id),
+    subscribe: (id: number, subscribed: boolean) => invoke('album:subscribe', id, subscribed),
+    sublist: (offset = 0, limit = 50) => invoke('album:sublist', offset, limit)
+  },
+  mv: {
+    all: (query: MVQuery = {}) => invoke('mv:all', query),
+    exclusive: (limit = 20, offset = 0) => invoke('mv:exclusive', limit, offset),
+    url: (id: number, resolution = 1080) => invoke('mv:url', id, resolution),
+    subscribe: (id: number, subscribed: boolean) => invoke('mv:subscribe', id, subscribed),
+    sublist: (offset = 0, limit = 50) => invoke('mv:sublist', offset, limit)
+  },
+  radio: {
+    next: () => invoke('radio:next'),
+    trash: (songId: number, time = 0) => invoke('radio:trash', songId, time)
   },
   song: {
     url: (id: number, level: Quality) => invoke('song:url', id, level),
@@ -50,14 +95,17 @@ const api = {
       invoke('comment:remove', songId, commentId)
   },
   search: {
-    query: (keyword: string, type: 1 | 1000 | 100, offset = 0) =>
-      invoke('search:query', keyword, type, offset)
+    query: (keyword: string, type: SearchType, offset = 0, limit = 30) =>
+      invoke('search:query', keyword, type, offset, limit),
+    suggest: (keyword: string) => invoke('search:suggest', keyword),
+    hot: () => invoke('search:hot')
   },
   discover: {
     daily: () => invoke('discover:daily'),
     playlists: () => invoke('discover:playlists'),
     newsongs: () => invoke('discover:newsongs'),
-    toplists: () => invoke('discover:toplists')
+    toplists: () => invoke('discover:toplists'),
+    toplistGroups: () => invoke('discover:toplist-groups')
   },
   media: {
     warm: (payload: MediaWarmPayload) => invoke('media:warm', payload)

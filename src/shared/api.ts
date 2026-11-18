@@ -1,5 +1,8 @@
 import type {
+  AlbumDetail,
   AppInfo,
+  ArtistDetail,
+  ArtistIntroduction,
   Comment,
   CommentFloorPage,
   CommentPage,
@@ -8,12 +11,18 @@ import type {
   DownloadRecord,
   LyricResult,
   MediaWarmPayload,
+  MV,
+  MvUrlResult,
   Playlist,
+  PlaylistCatalogue,
   Profile,
   Quality,
+  SearchUser,
   Settings,
   Song,
-  SongUrlResult
+  SongUrlResult,
+  ToplistGroup,
+  UserProfile
 } from './types'
 
 export interface SearchArtist {
@@ -31,6 +40,77 @@ export interface SearchResult {
   playlistCount?: number
   artists?: SearchArtist[]
   artistCount?: number
+  albums?: AlbumDetail[]
+  albumCount?: number
+  mvs?: MV[]
+  mvCount?: number
+  userprofiles?: SearchUser[]
+  userCount?: number
+}
+
+export type SearchType = 1 | 10 | 100 | 1000 | 1002 | 1004
+
+export interface ArtistPageData {
+  artist: ArtistDetail
+  hotSongs: Song[]
+  more: boolean
+}
+
+export interface ArtistAlbumsData {
+  artist: ArtistDetail | null
+  hotAlbums: AlbumDetail[]
+  more: boolean
+}
+
+export interface ArtistMvsData {
+  mvs: MV[]
+  hasMore: boolean
+}
+
+export interface ArtistIntroData {
+  briefDesc: string
+  introduction: ArtistIntroduction[]
+}
+
+export interface AlbumPageData {
+  album: AlbumDetail
+  songs: Song[]
+}
+
+export interface MVListData {
+  data: MV[]
+  hasMore: boolean
+  count?: number
+}
+
+export interface MVQuery {
+  area?: string
+  type?: string
+  order?: string
+  limit?: number
+  offset?: number
+}
+
+export interface HighQualityParams {
+  cat?: string
+  limit?: number
+  lasttime?: number
+  offset?: number
+  total?: boolean
+}
+
+export interface HighQualityData {
+  playlists: Playlist[]
+  more: boolean
+  lasttime?: number
+  total?: number
+}
+
+export interface PlaylistMutation {
+  id: number
+  name: string
+  coverImgUrl?: string
+  description?: string
 }
 
 export interface NcmApi {
@@ -59,9 +139,52 @@ export interface NcmApi {
   }
   user: {
     playlists(uid: number): Promise<Playlist[]>
+    detail(uid: number): Promise<UserProfile>
+    follows(uid: number, offset?: number, limit?: number): Promise<{ users: UserProfile[]; more: boolean }>
+    followers(uid: number, offset?: number, limit?: number): Promise<{ users: UserProfile[]; more: boolean }>
+    /** 听歌排行：type 1 = 最近一周，0 = 所有时间 */
+    playRecord(uid: number, type?: 0 | 1): Promise<Song[]>
+    /** 最近播放（PC 端） */
+    recent(limit?: number): Promise<Song[]>
   }
   playlist: {
     detail(id: number): Promise<Playlist | null>
+    catalogue(): Promise<PlaylistCatalogue>
+    highquality(params?: HighQualityParams): Promise<HighQualityData>
+    subscribe(id: number, subscribed: boolean): Promise<void>
+    create(name: string): Promise<Playlist | null>
+    rename(id: number, name: string): Promise<void>
+    updateDesc(id: number, description: string): Promise<void>
+    updateTags(id: number, tags: string): Promise<void>
+    addTracks(id: number, trackIds: number[]): Promise<void>
+    removeTracks(id: number, trackIds: number[]): Promise<void>
+  }
+  artist: {
+    detail(id: number): Promise<ArtistPageData>
+    albums(id: number, offset?: number, limit?: number): Promise<ArtistAlbumsData>
+    mvs(id: number, offset?: number, limit?: number): Promise<ArtistMvsData>
+    introduction(id: number): Promise<ArtistIntroData>
+    subscribe(id: number, subscribed: boolean): Promise<void>
+    sublist(offset?: number, limit?: number): Promise<{ data: ArtistDetail[]; hasMore: boolean; count: number }>
+    similar(id: number): Promise<ArtistDetail[]>
+  }
+  album: {
+    detail(id: number): Promise<AlbumPageData>
+    subscribe(id: number, subscribed: boolean): Promise<void>
+    sublist(offset?: number, limit?: number): Promise<{ data: AlbumDetail[]; hasMore: boolean }>
+  }
+  mv: {
+    all(query?: MVQuery): Promise<MVListData>
+    exclusive(limit?: number, offset?: number): Promise<MV[]>
+    url(id: number, resolution?: number): Promise<MvUrlResult>
+    subscribe(id: number, subscribed: boolean): Promise<void>
+    sublist(offset?: number, limit?: number): Promise<MV[]>
+  }
+  radio: {
+    /** 私人漫游下一批歌曲 */
+    next(): Promise<Song[]>
+    /** 垃圾桶 / 不感兴趣，并尽量返回后续歌曲 */
+    trash(songId: number, time?: number): Promise<Song[]>
   }
   song: {
     url(id: number, level: Quality): Promise<SongUrlResult>
@@ -83,13 +206,16 @@ export interface NcmApi {
     remove(songId: number, commentId: number): Promise<void>
   }
   search: {
-    query(keyword: string, type: 1 | 1000 | 100, offset?: number): Promise<SearchResult>
+    query(keyword: string, type: SearchType, offset?: number, limit?: number): Promise<SearchResult>
+    suggest(keyword: string): Promise<string[]>
+    hot(): Promise<string[]>
   }
   discover: {
     daily(): Promise<Song[]>
     playlists(): Promise<Playlist[]>
     newsongs(): Promise<Song[]>
     toplists(): Promise<Playlist[]>
+    toplistGroups(): Promise<ToplistGroup[]>
   }
   media: {
     warm(payload: MediaWarmPayload): Promise<void>

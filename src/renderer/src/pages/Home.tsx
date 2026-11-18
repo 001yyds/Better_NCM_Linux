@@ -1,14 +1,16 @@
-import { useEffect } from 'react'
-import { Heart, Play, Sparkles, TrendingUp } from 'lucide-react'
-import { coverUrl, songArtists, songCover } from '../lib/api'
+import { useEffect, useState } from 'react'
+import { Disc3, History, LayoutGrid, Play, Radio, Sparkles, TrendingUp, Heart } from 'lucide-react'
+import type { MV } from '../../../shared/types'
+import { api, coverUrl, songArtists, songCover } from '../lib/api'
 import { rgba, useDominantColor } from '../lib/color'
 import { greeting, todayLabel } from '../lib/format'
 import { isMobile } from '../lib/platform'
 import { useAuthStore } from '../store/auth'
 import { useContentStore } from '../store/content'
 import { usePlayerStore } from '../store/player'
-import { useUiStore } from '../store/ui'
+import { useUiStore, type Route } from '../store/ui'
 import { Cover } from '../components/Cover'
+import { MVCard } from '../components/MVCard'
 import { PlaylistCard } from '../components/PlaylistCard'
 import { SectionHeader } from '../components/SectionHeader'
 
@@ -30,14 +32,36 @@ export function Home(): React.JSX.Element {
   const navigate = useUiStore((state) => state.navigate)
   const playQueue = usePlayerStore((state) => state.playQueue)
   const play = usePlayerStore((state) => state.play)
+  const [mvs, setMvs] = useState<MV[]>([])
 
   useEffect(() => {
     void load()
   }, [load])
 
+  useEffect(() => {
+    let alive = true
+    api.mv
+      .exclusive(8)
+      .then((list) => {
+        if (alive) setMvs(list)
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [])
+
   const heroCover = daily[0] ? songCover(daily[0], 500) : ''
   const heroColor = useDominantColor(heroCover || undefined)
   const likedPlaylist = authPlaylists.find((playlist) => playlist.specialType === 5)
+
+  const entries = [
+    { icon: TrendingUp, label: '排行榜', hint: '官方 / 精选 / 曲风', page: 'toplist' },
+    { icon: LayoutGrid, label: '歌单广场', hint: '按分类发现', page: 'square' },
+    { icon: Radio, label: '私人漫游', hint: '不会停的推荐', page: 'radio' },
+    { icon: Disc3, label: '我的收藏', hint: '专辑 / 歌手 / MV', page: 'collection' },
+    { icon: History, label: '播放记录', hint: '最近与排行', page: 'history' }
+  ] as const
 
   return (
     <div className="relative min-h-full px-4 pb-8 pt-5 sm:px-8 sm:pb-10 sm:pt-7">
@@ -219,6 +243,29 @@ export function Home(): React.JSX.Element {
         )}
       </div>
 
+      <section className="relative mt-6 sm:mt-7">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-5">
+          {entries.map((entry) => {
+            const Icon = entry.icon
+            return (
+              <button
+                key={entry.page}
+                onClick={() => navigate({ page: entry.page } as Route)}
+                className="glass-soft group flex items-center gap-2.5 rounded-[16px] border border-white/40 px-3 py-2.5 text-left transition-all duration-200 hover:bg-white/30 active:scale-[0.985]"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-white/45 bg-white/20 text-brand transition-colors group-hover:bg-brand/10">
+                  <Icon size={15} strokeWidth={1.8} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-[12px] text-black/75">{entry.label}</span>
+                  <span className="block truncate text-[9.5px] text-black/35">{entry.hint}</span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </section>
+
       <section className="relative mt-9">
         <SectionHeader
           title="推荐歌单"
@@ -272,6 +319,17 @@ export function Home(): React.JSX.Element {
                 <div className="mt-2.5 truncate px-1 text-[12px] text-black/80 group-hover:text-black">{song.name}</div>
                 <div className="truncate px-1 pb-0.5 text-[10.5px] text-black/40">{songArtists(song)}</div>
               </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {mvs.length > 0 && (
+        <section className="relative mt-10">
+          <SectionHeader title="MV 精选" subtitle="官方推荐音乐视频" />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {mvs.slice(0, 6).map((mv) => (
+              <MVCard key={mv.id} mv={mv} />
             ))}
           </div>
         </section>

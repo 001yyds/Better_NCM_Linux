@@ -5,9 +5,26 @@ export type Route =
   | { page: 'home' }
   | { page: 'library' }
   | { page: 'playlist'; id: number; title?: string }
+  | { page: 'artist'; id: number; title?: string }
+  | { page: 'album'; id: number; title?: string }
+  | {
+      page: 'mv'
+      id: number
+      title?: string
+      cover?: string
+      artist?: string
+      artistId?: number
+      subed?: boolean
+    }
+  | { page: 'user'; id: number; title?: string }
   | { page: 'search'; keyword?: string }
   | { page: 'downloads' }
   | { page: 'daily' }
+  | { page: 'radio' }
+  | { page: 'toplist' }
+  | { page: 'square' }
+  | { page: 'collection' }
+  | { page: 'history' }
   | { page: 'settings' }
 
 export interface Toast {

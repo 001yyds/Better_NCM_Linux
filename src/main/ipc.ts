@@ -3,6 +3,7 @@ import { once } from 'node:events'
 import { createWriteStream } from 'node:fs'
 import { mkdir, stat, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
+import type { HighQualityParams, MVQuery, SearchType } from '../shared/api'
 import type { DownloadRecord, MediaWarmPayload, Quality, Settings, Song } from '../shared/types'
 import {
   setDesktopLyricsFont,
@@ -121,7 +122,80 @@ export function registerIpc(): void {
   })
 
   ipcMain.handle('user:playlists', async (_event, uid: number) => netease.userPlaylists(uid))
+  ipcMain.handle('user:detail', (_event, uid: number) => netease.userDetail(uid))
+  ipcMain.handle('user:follows', (_event, uid: number, offset = 0, limit = 30) =>
+    netease.userFollows(uid, offset, limit)
+  )
+  ipcMain.handle('user:followers', (_event, uid: number, offset = 0, limit = 30) =>
+    netease.userFollowers(uid, offset, limit)
+  )
+  ipcMain.handle('user:play-record', (_event, uid: number, type: 0 | 1 = 1) =>
+    netease.userPlayRecord(uid, type)
+  )
+  ipcMain.handle('user:recent', (_event, limit = 100) => netease.userRecent(limit))
   ipcMain.handle('playlist:detail', (_event, id: number) => netease.playlistDetail(id))
+  ipcMain.handle('playlist:catalogue', () => netease.playlistCatalogue())
+  ipcMain.handle('playlist:highquality', (_event, params: HighQualityParams = {}) =>
+    netease.playlistHighQuality(params)
+  )
+  ipcMain.handle('playlist:subscribe', (_event, id: number, subscribed: boolean) =>
+    netease.playlistSubscribe(id, subscribed)
+  )
+  ipcMain.handle('playlist:create', (_event, name: string) => netease.playlistCreate(name))
+  ipcMain.handle('playlist:rename', (_event, id: number, name: string) =>
+    netease.playlistRename(id, name)
+  )
+  ipcMain.handle('playlist:update-desc', (_event, id: number, description: string) =>
+    netease.playlistUpdateDesc(id, description)
+  )
+  ipcMain.handle('playlist:update-tags', (_event, id: number, tags: string) =>
+    netease.playlistUpdateTags(id, tags)
+  )
+  ipcMain.handle('playlist:add-tracks', (_event, id: number, trackIds: number[]) =>
+    netease.playlistAddTracks(id, trackIds)
+  )
+  ipcMain.handle('playlist:remove-tracks', (_event, id: number, trackIds: number[]) =>
+    netease.playlistRemoveTracks(id, trackIds)
+  )
+  ipcMain.handle('artist:detail', (_event, id: number) => netease.artistDetail(id))
+  ipcMain.handle('artist:albums', (_event, id: number, offset = 0, limit = 30) =>
+    netease.artistAlbums(id, offset, limit)
+  )
+  ipcMain.handle('artist:mvs', (_event, id: number, offset = 0, limit = 20) =>
+    netease.artistMvs(id, offset, limit)
+  )
+  ipcMain.handle('artist:introduction', (_event, id: number) => netease.artistIntroduction(id))
+  ipcMain.handle('artist:subscribe', (_event, id: number, subscribed: boolean) =>
+    netease.artistSubscribe(id, subscribed)
+  )
+  ipcMain.handle('artist:sublist', (_event, offset = 0, limit = 50) =>
+    netease.artistSublist(offset, limit)
+  )
+  ipcMain.handle('artist:similar', (_event, id: number) => netease.artistSimilar(id))
+  ipcMain.handle('album:detail', (_event, id: number) => netease.albumDetail(id))
+  ipcMain.handle('album:subscribe', (_event, id: number, subscribed: boolean) =>
+    netease.albumSubscribe(id, subscribed)
+  )
+  ipcMain.handle('album:sublist', (_event, offset = 0, limit = 50) =>
+    netease.albumSublist(offset, limit)
+  )
+  ipcMain.handle('mv:all', (_event, query: MVQuery = {}) => netease.mvAll(query))
+  ipcMain.handle('mv:exclusive', (_event, limit = 20, offset = 0) =>
+    netease.mvExclusive(limit, offset)
+  )
+  ipcMain.handle('mv:url', (_event, id: number, resolution = 1080) =>
+    netease.mvUrl(id, resolution)
+  )
+  ipcMain.handle('mv:subscribe', (_event, id: number, subscribed: boolean) =>
+    netease.mvSubscribe(id, subscribed)
+  )
+  ipcMain.handle('mv:sublist', (_event, offset = 0, limit = 50) =>
+    netease.mvSublist(offset, limit)
+  )
+  ipcMain.handle('radio:next', () => netease.radioNext())
+  ipcMain.handle('radio:trash', (_event, songId: number, time = 0) =>
+    netease.radioTrash(songId, time)
+  )
   ipcMain.handle('song:url', (_event, id: number, level: Quality) => netease.songUrl(id, level))
   ipcMain.handle('song:lyric', (_event, id: number) => netease.lyric(id))
   ipcMain.handle('song:like', (_event, id: number, like: boolean) => netease.like(id, like))
@@ -145,13 +219,18 @@ export function registerIpc(): void {
   ipcMain.handle('comment:remove', (_event, songId: number, commentId: number) =>
     netease.deleteComment(songId, commentId)
   )
-  ipcMain.handle('search:query', (_event, keyword: string, type: 1 | 1000 | 100, offset = 0) =>
-    netease.search(keyword, type, offset)
+  ipcMain.handle(
+    'search:query',
+    (_event, keyword: string, type: SearchType, offset = 0, limit = 30) =>
+      netease.search(keyword, type, offset, limit)
   )
+  ipcMain.handle('search:suggest', (_event, keyword: string) => netease.searchSuggest(keyword))
+  ipcMain.handle('search:hot', () => netease.searchHot())
   ipcMain.handle('discover:daily', () => netease.dailySongs())
   ipcMain.handle('discover:playlists', () => netease.recommendPlaylists())
   ipcMain.handle('discover:newsongs', () => netease.newSongs())
   ipcMain.handle('discover:toplists', () => netease.toplists())
+  ipcMain.handle('discover:toplist-groups', () => netease.toplistGroups())
 
   ipcMain.handle('media:warm', (_event, payload: MediaWarmPayload) => warmAudio(payload))
   ipcMain.handle('cache:info', () => cacheInfo())

@@ -111,6 +111,123 @@ export interface SongUrlResult {
 export interface LyricResult {
   lrc: string
   tlyric: string
+  /** 逐字歌词（yrc），部分歌曲与登录态才有 */
+  yrc?: string
+  /** 逐字翻译 */
+  ytlyric?: string
+  /** 卡拉 OK 歌词 */
+  klyric?: string
+  /** 罗马音 */
+  romalrc?: string
+  /** 主进程/接口返回的歌词偏移（毫秒） */
+  offset?: number
+}
+
+export interface ArtistDetail extends Artist {
+  picUrl?: string
+  img1v1Url?: string
+  briefDesc?: string
+  alias?: string[]
+  trans?: string
+  albumSize?: number
+  musicSize?: number
+  mvSize?: number
+  followed?: boolean
+}
+
+export interface AlbumDetail extends Album {
+  songs?: Song[]
+  artist?: Artist
+  artists?: Artist[]
+  publishTime?: number
+  company?: string
+  description?: string
+  briefDesc?: string
+  size?: number
+  subType?: string
+  tags?: string
+  followed?: boolean
+}
+
+export interface MV {
+  id: number
+  name: string
+  cover?: string
+  playCount?: number
+  briefDesc?: string
+  desc?: string
+  artistName?: string
+  artistId?: number
+  duration?: number
+  artists?: Artist[]
+  subed?: boolean
+}
+
+export interface SearchUser {
+  userId: number
+  nickname: string
+  avatarUrl?: string
+  signature?: string
+  followed?: boolean
+  accountStatus?: number
+  authStatus?: number
+}
+
+export interface UserProfile extends Profile {
+  level?: number
+  listenSongs?: number
+  followed?: boolean
+}
+
+export interface ToplistSongPreview {
+  first?: string
+  second?: string
+}
+
+export interface ToplistItem {
+  id: number
+  name: string
+  updateFrequency?: string
+  coverUrl?: string
+  coverImgUrl?: string
+  tracks?: ToplistSongPreview[]
+  toplistCode?: string
+  category?: string
+  canPlay?: boolean
+}
+
+export interface ToplistGroup {
+  name: string
+  categoryCode?: string
+  list: ToplistItem[]
+}
+
+export interface PlaylistCategory {
+  name: string
+  resourceCount?: number
+  hot?: boolean
+  category?: number
+}
+
+export interface PlaylistCatalogue {
+  all?: PlaylistCategory
+  sub: PlaylistCategory[]
+  categories?: Record<string, string[]>
+}
+
+export interface ArtistIntroduction {
+  ti?: string
+  txt?: string
+}
+
+export interface MvUrlResult {
+  id: number
+  url: string | null
+  r?: number
+  size?: number
+  fee?: number
+  mvFee?: number
+  code?: number
 }
 
 export interface CommentUser {

@@ -1,16 +1,35 @@
 import crypto from 'node:crypto'
 import { clearCookies, loadCookies, saveCookies } from '../store'
 import type {
+  AlbumPageData,
+  ArtistAlbumsData,
+  ArtistIntroData,
+  ArtistMvsData,
+  ArtistPageData,
+  HighQualityData,
+  HighQualityParams,
+  MVListData,
+  MVQuery,
+  SearchType
+} from '../../shared/api'
+import type {
+  AlbumDetail,
+  ArtistDetail,
   Comment,
   CommentFloorPage,
   CommentPage,
   CommentSort,
   LyricResult,
+  MV,
+  MvUrlResult,
   Playlist,
+  PlaylistCatalogue,
   Profile,
   Quality,
   Song,
-  SongUrlResult
+  SongUrlResult,
+  ToplistGroup,
+  UserProfile
 } from '../../shared/types'
 import { encodeWeapi } from './crypto'
 
@@ -261,6 +280,354 @@ class NeteaseClient {
     return playlist
   }
 
+  async userDetail(uid: number): Promise<UserProfile> {
+    const result = await this.request(`v1/user/detail/${uid}`, {})
+    this.assertOk(result, '用户信息加载失败')
+    const profile = (result.profile as UserProfile) ?? null
+    if (!profile) throw new Error('用户不存在')
+    return {
+      ...profile,
+      level: result.level ?? profile.level,
+      listenSongs: result.listenSongs ?? profile.listenSongs
+    }
+  }
+
+  async userFollows(
+    uid: number,
+    offset = 0,
+    limit = 30
+  ): Promise<{ users: UserProfile[]; more: boolean }> {
+    const result = await this.request(`user/getfollows/${uid}`, { offset, limit, order: true })
+    this.assertOk(result, '关注列表加载失败')
+    const list = (result.follow as UserProfile[]) ?? []
+    return { users: list, more: !!result.more }
+  }
+
+  async userFollowers(
+    uid: number,
+    offset = 0,
+    limit = 30
+  ): Promise<{ users: UserProfile[]; more: boolean }> {
+    const result = await this.request(`user/getfolloweds/${uid}`, {
+      userId: uid,
+      offset,
+      limit,
+      time: -1,
+      scene: 'user'
+    })
+    this.assertOk(result, '粉丝列表加载失败')
+    return {
+      users: (result.followeds as UserProfile[]) ?? [],
+      more: !!result.more
+    }
+  }
+
+  async userPlayRecord(uid: number, type: 0 | 1 = 1): Promise<Song[]> {
+    const result = await this.request('v1/play/record', { uid, type })
+    this.assertOk(result, '听歌排行加载失败')
+    const list = (result.allData ?? result.weekData ?? []) as Json[]
+    return list
+      .map((item) => (item.song as Song) ?? null)
+      .filter((song): song is Song => !!song?.id)
+  }
+
+  async userRecent(limit = 100): Promise<Song[]> {
+    const result = await this.request('pc/recent/listen/list', { limit, total: true })
+    this.assertOk(result, '最近播放加载失败')
+    const resources = (result.data?.resources as Json[]) ?? []
+    return resources
+      .map((item) => ((item.song ?? item.resource ?? item) as Song) ?? null)
+      .filter((song): song is Song => !!song?.id)
+  }
+
+  async artistDetail(id: number): Promise<ArtistPageData> {
+    const result = await this.request(`v1/artist/${id}`, {})
+    this.assertOk(result, '歌手信息加载失败')
+    const artist = (result.artist as ArtistDetail) ?? null
+    if (!artist) throw new Error('歌手不存在')
+    return {
+      artist,
+      hotSongs: (result.hotSongs as Song[]) ?? [],
+      more: !!result.more
+    }
+  }
+
+  async artistAlbums(id: number, offset = 0, limit = 30): Promise<ArtistAlbumsData> {
+    const result = await this.request(`artist/albums/${id}`, { offset, limit, total: true })
+    this.assertOk(result, '歌手专辑加载失败')
+    return {
+      artist: (result.artist as ArtistDetail) ?? null,
+      hotAlbums: (result.hotAlbums as AlbumDetail[]) ?? [],
+      more: !!result.more
+    }
+  }
+
+  async artistMvs(id: number, offset = 0, limit = 20): Promise<ArtistMvsData> {
+    const result = await this.request('artist/mvs', { artistId: id, offset, limit, total: true })
+    this.assertOk(result, '歌手 MV 加载失败')
+    return { mvs: (result.mvs as MV[]) ?? [], hasMore: !!result.hasMore }
+  }
+
+  async artistIntroduction(id: number): Promise<ArtistIntroData> {
+    const result = await this.request('artist/introduction', { id })
+    this.assertOk(result, '歌手简介加载失败')
+    return {
+      briefDesc: (result.briefDesc as string) ?? '',
+      introduction: (result.introduction as ArtistIntroData['introduction']) ?? []
+    }
+  }
+
+  async artistSubscribe(id: number, subscribed: boolean): Promise<void> {
+    this.ensure()
+    const result = await this.request(subscribed ? 'artist/sub' : 'artist/unsub', {
+      artistId: id,
+      artistIds: `[${id}]`,
+      csrf_token: this.csrfToken()
+    })
+    this.assertOk(result, subscribed ? '关注歌手失败' : '取消关注失败')
+  }
+
+  async artistSublist(
+    offset = 0,
+    limit = 50
+  ): Promise<{ data: ArtistDetail[]; hasMore: boolean; count: number }> {
+    const result = await this.request('artist/sublist', { offset, limit })
+    this.assertOk(result, '收藏歌手加载失败')
+    return {
+      data: (result.data as ArtistDetail[]) ?? [],
+      hasMore: !!result.hasMore,
+      count: (result.count as number) ?? 0
+    }
+  }
+
+  async artistSimilar(id: number): Promise<ArtistDetail[]> {
+    const result = await this.request('discovery/simiArtist', { artistid: id })
+    this.assertOk(result, '相似歌手加载失败')
+    return (result.artists as ArtistDetail[]) ?? []
+  }
+
+  async albumDetail(id: number): Promise<AlbumPageData> {
+    const result = await this.request(`v1/album/${id}`, {})
+    this.assertOk(result, '专辑信息加载失败')
+    const album = (result.album as AlbumDetail) ?? null
+    if (!album) throw new Error('专辑不存在')
+    const songs = (result.songs as Song[]) ?? album.songs ?? []
+    return { album, songs }
+  }
+
+  async albumSubscribe(id: number, subscribed: boolean): Promise<void> {
+    this.ensure()
+    const result = await this.request(subscribed ? 'album/sub' : 'album/unsub', {
+      id,
+      csrf_token: this.csrfToken()
+    })
+    this.assertOk(result, subscribed ? '收藏专辑失败' : '取消收藏失败')
+  }
+
+  async albumSublist(
+    offset = 0,
+    limit = 50
+  ): Promise<{ data: AlbumDetail[]; hasMore: boolean }> {
+    const result = await this.request('album/sublist', { offset, limit, total: true })
+    this.assertOk(result, '收藏专辑加载失败')
+    return {
+      data: (result.data as AlbumDetail[]) ?? [],
+      hasMore: !!result.hasMore
+    }
+  }
+
+  async mvAll(query: MVQuery = {}): Promise<MVListData> {
+    const result = await this.request('mv/all', {
+      area: query.area ?? '全部',
+      type: query.type ?? '全部',
+      order: query.order ?? '上升最快',
+      limit: query.limit ?? 30,
+      offset: query.offset ?? 0
+    })
+    this.assertOk(result, 'MV 列表加载失败')
+    return {
+      data: (result.data as MV[]) ?? [],
+      hasMore: !!result.hasMore,
+      count: result.count as number | undefined
+    }
+  }
+
+  async mvExclusive(limit = 20, offset = 0): Promise<MV[]> {
+    const result = await this.request('mv/exclusive/rcmd', { limit, offset })
+    this.assertOk(result, 'MV 推荐加载失败')
+    return (result.data as MV[]) ?? []
+  }
+
+  async mvUrl(id: number, resolution = 1080): Promise<MvUrlResult> {
+    const result = await this.request('song/enhance/play/mv/url', { id, r: resolution })
+    const data = (result.data as Record<string, unknown> | undefined) ?? {}
+    return {
+      id,
+      url: (data.url as string) ?? null,
+      r: data.r as number | undefined,
+      size: data.size as number | undefined,
+      fee: data.fee as number | undefined,
+      mvFee: data.mvFee as number | undefined,
+      code: result.code as number | undefined
+    }
+  }
+
+  async mvSubscribe(id: number, subscribed: boolean): Promise<void> {
+    this.ensure()
+    const result = await this.request(subscribed ? 'mv/sub' : 'mv/unsub', {
+      mvid: id,
+      csrf_token: this.csrfToken()
+    })
+    this.assertOk(result, subscribed ? '收藏 MV 失败' : '取消收藏失败')
+  }
+
+  async mvSublist(offset = 0, limit = 50): Promise<MV[]> {
+    const result = await this.request('mv/sublist', { offset, limit })
+    this.assertOk(result, '收藏 MV 加载失败')
+    return (result.data as MV[]) ?? []
+  }
+
+  async radioNext(): Promise<Song[]> {
+    const result = await this.request('v1/radio/get', {})
+    this.assertOk(result, '私人漫游加载失败')
+    return (result.data as Song[]) ?? []
+  }
+
+  async radioTrash(songId: number, time = 0): Promise<Song[]> {
+    this.ensure()
+    const result = await this.request('v1/radio/skip', {
+      songId,
+      time,
+      csrf_token: this.csrfToken()
+    })
+    this.assertOk(result, '操作失败')
+    return (result.songs as Song[]) ?? []
+  }
+
+  async toplistGroups(): Promise<ToplistGroup[]> {
+    const result = await this.request('toplist/detail/v2', {})
+    this.assertOk(result, '排行榜加载失败')
+    const groups = (result.data as Json[]) ?? []
+    return groups.map((group) => ({
+      name: (group.name as string) ?? '',
+      categoryCode: group.categoryCode as string | undefined,
+      list: ((group.list as Json[]) ?? []).map((item) => ({
+        id: item.id as number,
+        name: (item.name as string) ?? '',
+        updateFrequency: item.updateFrequency as string | undefined,
+        coverUrl: (item.coverUrl ?? item.coverImgUrl) as string | undefined,
+        coverImgUrl: item.coverImgUrl as string | undefined,
+        tracks: ((item.tracks as Json[]) ?? []).map((track) => ({
+          first: track.first as string | undefined,
+          second: track.second as string | undefined
+        })),
+        toplistCode: item.toplistCode as string | undefined,
+        category: item.category as string | undefined,
+        canPlay: item.canPlay as boolean | undefined
+      }))
+    }))
+  }
+
+  async playlistCatalogue(): Promise<PlaylistCatalogue> {
+    const result = await this.request('playlist/catalogue', {})
+    this.assertOk(result, '歌单分类加载失败')
+    return {
+      all: result.all as PlaylistCatalogue['all'],
+      sub: (result.sub as PlaylistCatalogue['sub']) ?? [],
+      categories: (result.categories as Record<string, string[]>) ?? {}
+    }
+  }
+
+  async playlistHighQuality(params: HighQualityParams = {}): Promise<HighQualityData> {
+    const result = await this.request('playlist/highquality/list', {
+      cat: params.cat ?? '全部',
+      limit: params.limit ?? 30,
+      lasttime: params.lasttime ?? 0,
+      offset: params.offset ?? 0,
+      total: params.total ?? true
+    })
+    this.assertOk(result, '精品歌单加载失败')
+    return {
+      playlists: (result.playlists as Playlist[]) ?? [],
+      more: !!result.more,
+      lasttime: result.lasttime as number | undefined,
+      total: result.total as number | undefined
+    }
+  }
+
+  async playlistSubscribe(id: number, subscribed: boolean): Promise<void> {
+    this.ensure()
+    const result = await this.request(subscribed ? 'playlist/subscribe' : 'playlist/unsubscribe', {
+      id,
+      csrf_token: this.csrfToken()
+    })
+    this.assertOk(result, subscribed ? '收藏歌单失败' : '取消收藏失败')
+  }
+
+  async playlistCreate(name: string): Promise<Playlist | null> {
+    this.ensure()
+    const result = await this.request('playlist/create', {
+      name,
+      csrf_token: this.csrfToken()
+    })
+    this.assertOk(result, '创建歌单失败')
+    return (result.playlist as Playlist) ?? null
+  }
+
+  async playlistRename(id: number, name: string): Promise<void> {
+    this.ensure()
+    const result = await this.request('playlist/update/name', {
+      id,
+      name,
+      csrf_token: this.csrfToken()
+    })
+    this.assertOk(result, '歌单改名失败')
+  }
+
+  async playlistUpdateDesc(id: number, description: string): Promise<void> {
+    this.ensure()
+    const result = await this.request('playlist/desc/update', {
+      id,
+      desc: description,
+      csrf_token: this.csrfToken()
+    })
+    this.assertOk(result, '歌单简介更新失败')
+  }
+
+  async playlistUpdateTags(id: number, tags: string): Promise<void> {
+    this.ensure()
+    const result = await this.request('playlist/tags/update', {
+      id,
+      tags,
+      csrf_token: this.csrfToken()
+    })
+    this.assertOk(result, '歌单标签更新失败')
+  }
+
+  async playlistAddTracks(id: number, trackIds: number[]): Promise<void> {
+    this.ensure()
+    if (!trackIds.length) return
+    const result = await this.request('playlist/manipulate/tracks', {
+      pid: id,
+      trackIds: JSON.stringify(trackIds),
+      op: 'add',
+      csrf_token: this.csrfToken()
+    })
+    this.assertOk(result, '添加歌曲失败')
+  }
+
+  async playlistRemoveTracks(id: number, trackIds: number[]): Promise<void> {
+    this.ensure()
+    if (!trackIds.length) return
+    const result = await this.request('playlist/manipulate/tracks', {
+      pid: id,
+      trackIds: JSON.stringify(trackIds),
+      op: 'del',
+      csrf_token: this.csrfToken()
+    })
+    this.assertOk(result, '删除歌曲失败')
+  }
+
   async songUrl(id: number, preferred: Quality): Promise<SongUrlResult> {
     const chain: Quality[] =
       preferred === 'lossless' || preferred === 'hires' ? [preferred, 'exhigh'] : [preferred]
@@ -395,14 +762,30 @@ class NeteaseClient {
   }
 
   async lyric(id: number): Promise<LyricResult> {
-    const result = await this.request('song/lyric', { id, lv: -1, kv: -1, tv: -1 })
+    const result = await this.request('song/lyric/v1', {
+      id,
+      cp: true,
+      tv: 1,
+      lv: 1,
+      rv: 1,
+      kv: 1
+    })
     return {
       lrc: (result.lrc?.lyric as string) ?? '',
-      tlyric: (result.tlyric?.lyric as string) ?? ''
+      tlyric: (result.tlyric?.lyric as string) ?? '',
+      yrc: (result.yrc?.lyric as string) ?? '',
+      ytlyric: (result.ytlyric?.lyric as string) ?? '',
+      klyric: (result.klyric?.lyric as string) ?? '',
+      romalrc: (result.romalrc?.lyric as string) ?? ''
     }
   }
 
-  async search(keywords: string, type: 1 | 1000 | 100, offset = 0, limit = 30): Promise<Json> {
+  async search(
+    keywords: string,
+    type: SearchType,
+    offset = 0,
+    limit = 30
+  ): Promise<Json> {
     const result = await this.request('cloudsearch/pc', {
       s: keywords,
       type,
@@ -410,7 +793,30 @@ class NeteaseClient {
       limit,
       total: true
     })
-    return result.result ?? {}
+    return (result.result as Json) ?? {}
+  }
+
+  async searchSuggest(keyword: string): Promise<string[]> {
+    const result = await this.request('search/suggest/web', { s: keyword })
+    const data = (result.result as Json) ?? {}
+    const names: string[] = []
+    const push = (value: unknown): void => {
+      if (typeof value === 'string' && value.trim() && !names.includes(value)) names.push(value)
+    }
+    for (const song of (data.songs as Json[]) ?? []) push(song.name)
+    for (const album of (data.albums as Json[]) ?? []) push(album.name)
+    for (const artist of (data.artists as Json[]) ?? []) push(artist.name)
+    for (const playlist of (data.playlists as Json[]) ?? []) push(playlist.name)
+    return names.slice(0, 10)
+  }
+
+  async searchHot(): Promise<string[]> {
+    const result = await this.request('search/default/keyword/get', {})
+    const keywords = (result.data?.keywords as Json[]) ?? []
+    return keywords
+      .map((item) => (item.realkeyword ?? item.showKeyword) as string)
+      .filter((item): item is string => !!item)
+      .slice(0, 12)
   }
 
   async dailySongs(): Promise<Song[]> {

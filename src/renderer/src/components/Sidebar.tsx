@@ -1,4 +1,16 @@
-import { ChevronRight, Download, LibraryBig, Plus, Settings2, Sparkles } from 'lucide-react'
+import {
+  ChevronRight,
+  Disc3,
+  History,
+  LayoutGrid,
+  LibraryBig,
+  Plus,
+  Radio,
+  Settings2,
+  Sparkles,
+  TrendingUp,
+  Download
+} from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { coverUrl } from '../lib/api'
 import { cn } from '../lib/cn'
@@ -50,10 +62,40 @@ export function Sidebar(): React.JSX.Element {
       <nav className="flex flex-col gap-1 px-2.5 pt-1">
         <NavItem icon={Sparkles} label="推荐" active={route.page === 'home'} onClick={() => navigate({ page: 'home' })} />
         <NavItem
+          icon={TrendingUp}
+          label="排行榜"
+          active={route.page === 'toplist'}
+          onClick={() => navigate({ page: 'toplist' })}
+        />
+        <NavItem
+          icon={LayoutGrid}
+          label="歌单广场"
+          active={route.page === 'square'}
+          onClick={() => navigate({ page: 'square' })}
+        />
+        <NavItem
+          icon={Radio}
+          label="私人漫游"
+          active={route.page === 'radio'}
+          onClick={() => navigate({ page: 'radio' })}
+        />
+        <NavItem
           icon={LibraryBig}
           label="我的音乐"
           active={route.page === 'library'}
           onClick={() => navigate({ page: 'library' })}
+        />
+        <NavItem
+          icon={Disc3}
+          label="我的收藏"
+          active={route.page === 'collection'}
+          onClick={() => navigate({ page: 'collection' })}
+        />
+        <NavItem
+          icon={History}
+          label="播放记录"
+          active={route.page === 'history'}
+          onClick={() => navigate({ page: 'history' })}
         />
         <NavItem
           icon={Download}
