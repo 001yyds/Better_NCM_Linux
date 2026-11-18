@@ -48,8 +48,6 @@ makepkg -D build/arch -f --noconfirm              # Arch 包
 
 构建产物按版本归档在 `release/<version>/`（例如 `release/1.10.0/`），`release/linux-unpacked/` 是打包中间产物。
 
-发版流程与自检清单见 [`CLAUDE.md`](./CLAUDE.md)。
-
 打包后安装（用户级，无需 sudo）：
 
 ```bash
