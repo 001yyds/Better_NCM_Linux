@@ -17,6 +17,7 @@ import type {
 import type {
   AlbumDetail,
   AppInfo,
+  Banner,
   ArtistDetail,
   Comment,
   CommentFloorPage,
@@ -26,6 +27,8 @@ import type {
   LyricResult,
   MediaWarmPayload,
   MV,
+  MvDownloadRequest,
+  MvDownloadResult,
   MvUrlResult,
   Playlist,
   PlaylistCatalogue,
@@ -599,8 +602,13 @@ class MobileNetease {
       .filter((song): song is Song => !!song?.id)
   }
 
-  async userRecent(limit = 100): Promise<Song[]> {
-    const result = await this.request('pc/recent/listen/list', { limit, total: true })
+  async userRecent(limit = 100, uid?: number): Promise<Song[]> {
+    const result = await this.request('pc/recent/listen/list', {
+      limit,
+      offset: 0,
+      total: true,
+      ...(uid ? { uid } : {})
+    })
     this.assertOk(result, '最近播放加载失败')
     const resources = (result.data?.resources as Json[]) ?? []
     return resources
@@ -741,6 +749,56 @@ class MobileNetease {
     this.assertOk(result, subscribed ? '收藏 MV 失败' : '取消收藏失败')
   }
 
+  async downloadMv(request: MvDownloadRequest): Promise<MvDownloadResult> {
+    const result = await this.mvUrl(request.id, request.resolution ?? 720)
+    if (!result.url) throw new Error('该 MV 暂无可下载源')
+    const base =
+      safeName(`${request.artist ? `${request.artist} - ` : ''}${request.name}`) || `MV-${request.id}`
+    let file = `${base}.mp4`
+    let index = 1
+    while (await fileExists(`${DOC_DIR}/${file}`, Directory.Documents)) {
+      index += 1
+      file = `${base} (${index}).mp4`
+    }
+    const saved = await Filesystem.downloadFile({
+      url: result.url,
+      path: `${DOC_DIR}/${file}`,
+      directory: Directory.Documents,
+      headers: { 'User-Agent': UA, Referer: 'https://music.163.com/' },
+      recursive: true
+    })
+    let size = result.size ?? 0
+    try {
+      const info = await Filesystem.stat({
+        path: saved.path ?? `${DOC_DIR}/${file}`,
+        directory: Directory.Documents
+      })
+      size = info.size
+    } catch {
+      // keep upstream size
+    }
+    const current = readSettings()
+    writeSettings({
+      ...current,
+      downloads: [
+        {
+          id: -request.id,
+          kind: 'mv' as const,
+          name: request.name,
+          artist: request.artist ?? '',
+          album: 'MV',
+          cover: '',
+          level: 'standard' as const,
+          path: saved.path ?? `${DOC_LABEL}/${file}`,
+          size,
+          createdAt: Date.now()
+        },
+        ...current.downloads
+      ].slice(0, 200)
+    })
+    return { path: saved.path ?? `${DOC_LABEL}/${file}`, size }
+  }
+
   async mvSublist(offset = 0, limit = 50): Promise<MV[]> {
     const result = await this.request('mv/sublist', { offset, limit })
     this.assertOk(result, '收藏 MV 加载失败')
@@ -788,6 +846,18 @@ class MobileNetease {
     }))
   }
 
+  async playlistDynamic(
+    id: number
+  ): Promise<{ subscribed: boolean; playCount?: number; commentCount?: number }> {
+    const result = await this.request('playlist/detail/dynamic', { id })
+    this.assertOk(result, '歌单信息加载失败')
+    return {
+      subscribed: !!result.subscribed,
+      playCount: result.playCount as number | undefined,
+      commentCount: result.commentCount as number | undefined
+    }
+  }
+
   async playlistCatalogue(): Promise<PlaylistCatalogue> {
     const result = await this.request('playlist/catalogue', {})
     this.assertOk(result, '歌单分类加载失败')
@@ -832,6 +902,15 @@ class MobileNetease {
     })
     this.assertOk(result, '创建歌单失败')
     return (result.playlist as Playlist) ?? null
+  }
+
+  async playlistRemove(id: number): Promise<void> {
+    this.ensure()
+    const result = await this.request('playlist/delete', {
+      pid: id,
+      csrf_token: this.csrfToken()
+    })
+    this.assertOk(result, '删除歌单失败')
   }
 
   async playlistRename(id: number, name: string): Promise<void> {
@@ -886,6 +965,18 @@ class MobileNetease {
       csrf_token: this.csrfToken()
     })
     this.assertOk(result, '删除歌曲失败')
+  }
+
+  async songInfo(id: number): Promise<Song | null> {
+    const result = await this.request('v3/song/detail', { c: JSON.stringify([{ id }]) })
+    this.assertOk(result, '歌曲信息加载失败')
+    return ((result.songs as Song[]) ?? [])[0] ?? null
+  }
+
+  async banners(): Promise<Banner[]> {
+    const result = await this.request('v2/banner/get', { clientType: 'pc' })
+    this.assertOk(result, 'Banner 加载失败')
+    return (result.banners as Banner[]) ?? []
   }
 
   async songUrl(id: number, preferred: Quality): Promise<SongUrlResult> {
@@ -1025,11 +1116,11 @@ class MobileNetease {
   async lyric(id: number): Promise<LyricResult> {
     const result = await this.request('song/lyric/v1', {
       id,
-      cp: true,
-      tv: 1,
-      lv: 1,
-      rv: 1,
-      kv: 1
+      lv: -1,
+      tv: -1,
+      rv: -1,
+      yv: -1,
+      kv: -1
     })
     return {
       lrc: (result.lrc?.lyric as string) ?? '',
@@ -1125,6 +1216,8 @@ function defaults(): Settings {
     downloadDir: DOC_LABEL,
     downloads: [],
     lyricFontSize: 22,
+    lyricOffset: 0,
+    playbackRate: 1,
     desktopLyrics: false,
     desktopLyricsLocked: false,
     desktopLyricsFontSize: 30,
@@ -1328,15 +1421,17 @@ const api: NcmApi = {
     follows: (uid, offset = 0, limit = 30) => netease.userFollows(uid, offset, limit),
     followers: (uid, offset = 0, limit = 30) => netease.userFollowers(uid, offset, limit),
     playRecord: (uid, type = 1) => netease.userPlayRecord(uid, type),
-    recent: (limit = 100) => netease.userRecent(limit)
+    recent: (limit = 100, uid) => netease.userRecent(limit, uid)
   },
 
   playlist: {
     detail: (id) => netease.playlistDetail(id),
+    dynamic: (id) => netease.playlistDynamic(id),
     catalogue: () => netease.playlistCatalogue(),
     highquality: (params = {}) => netease.playlistHighQuality(params),
     subscribe: (id, subscribed) => netease.playlistSubscribe(id, subscribed),
     create: (name) => netease.playlistCreate(name),
+    remove: (id) => netease.playlistRemove(id),
     rename: (id, name) => netease.playlistRename(id, name),
     updateDesc: (id, description) => netease.playlistUpdateDesc(id, description),
     updateTags: (id, tags) => netease.playlistUpdateTags(id, tags),
@@ -1364,6 +1459,7 @@ const api: NcmApi = {
     all: (query = {}) => netease.mvAll(query),
     exclusive: (limit = 20, offset = 0) => netease.mvExclusive(limit, offset),
     url: (id, resolution = 1080) => netease.mvUrl(id, resolution),
+    download: (request) => netease.downloadMv(request),
     subscribe: (id, subscribed) => netease.mvSubscribe(id, subscribed),
     sublist: (offset = 0, limit = 50) => netease.mvSublist(offset, limit)
   },
@@ -1376,7 +1472,12 @@ const api: NcmApi = {
   song: {
     url: (id, level) => netease.songUrl(id, level),
     lyric: (id) => netease.lyric(id),
-    like: (id, like) => netease.like(id, like)
+    like: (id, like) => netease.like(id, like),
+    detail: (id) => netease.songInfo(id)
+  },
+
+  banner: {
+    list: () => netease.banners()
   },
 
   comment: {
@@ -1464,6 +1565,7 @@ const api: NcmApi = {
 
   events: {
     onDownloadProgress: () => () => undefined,
+    onMvProgress: () => () => undefined,
     onPlayerCommand: () => () => undefined
   }
 }

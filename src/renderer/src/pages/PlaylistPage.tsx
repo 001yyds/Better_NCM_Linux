@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Download, ListPlus, Play } from 'lucide-react'
-import type { Playlist } from '../../../shared/types'
-import { coverUrl } from '../lib/api'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Download, Heart, ListPlus, Loader2, Pencil, Play, Trash2, X } from 'lucide-react'
+import type { Playlist, Song } from '../../../shared/types'
+import { api, coverUrl } from '../lib/api'
 import { downloadSongs } from '../lib/actions'
+import { cn } from '../lib/cn'
 import { formatCount } from '../lib/format'
-import { cachedPlaylist, loadPlaylist } from '../lib/playlistCache'
+import { cachedPlaylist, invalidatePlaylist, loadPlaylist } from '../lib/playlistCache'
+import { useAuthStore } from '../store/auth'
 import { useLikesStore } from '../store/likes'
 import { usePlayerStore } from '../store/player'
 import { useSettingsStore } from '../store/settings'
@@ -17,11 +20,24 @@ export function PlaylistPage({ id }: { id: number }): React.JSX.Element {
   const [loading, setLoading] = useState(!cachedPlaylist(id))
   const navigate = useUiStore((state) => state.navigate)
   const toast = useUiStore((state) => state.toast)
+  const setLoginOpen = useUiStore((state) => state.setLoginOpen)
   const playQueue = usePlayerStore((state) => state.playQueue)
   const addToQueue = usePlayerStore((state) => state.addToQueue)
   const quality = useSettingsStore((state) => state.settings?.quality ?? 'exhigh')
   const liked = useLikesStore((state) => state.liked)
   const likesLoaded = useLikesStore((state) => state.loaded)
+  const loggedIn = useAuthStore((state) => state.loggedIn)
+  const profile = useAuthStore((state) => state.profile)
+
+  const [subscribed, setSubscribed] = useState(false)
+  const [subBusy, setSubBusy] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editDesc, setEditDesc] = useState('')
+  const [editTags, setEditTags] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const isFavorites =
     playlist?.specialType === 5 || !!playlist?.name.includes('喜欢的音乐')
@@ -30,6 +46,123 @@ export function PlaylistPage({ id }: { id: number }): React.JSX.Element {
     if (!isFavorites || !likesLoaded) return all
     return all.filter((song) => liked.has(song.id))
   }, [playlist?.tracks, isFavorites, likesLoaded, liked])
+
+  const isOwner = !!(
+    playlist &&
+    profile &&
+    (playlist.creator?.userId === profile.userId || playlist.userId === profile.userId)
+  )
+
+  useEffect(() => {
+    let alive = true
+    api.playlist
+      .dynamic(id)
+      .then((result) => {
+        if (alive) setSubscribed(result.subscribed)
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [id])
+
+  const toggleSubscribe = async (): Promise<void> => {
+    if (!loggedIn) {
+      setLoginOpen(true)
+      return
+    }
+    if (subBusy) return
+    setSubBusy(true)
+    const next = !subscribed
+    setSubscribed(next)
+    try {
+      await api.playlist.subscribe(id, next)
+      invalidatePlaylist(id)
+      toast(next ? '已收藏歌单' : '已取消收藏', 'success')
+    } catch (cause) {
+      setSubscribed(!next)
+      toast(cause instanceof Error ? cause.message : '操作失败', 'error')
+    } finally {
+      setSubBusy(false)
+    }
+  }
+
+  const removeTrack = async (song: Song): Promise<void> => {
+    try {
+      await api.playlist.removeTracks(id, [song.id])
+      invalidatePlaylist(id)
+      setPlaylist((previous) =>
+        previous
+          ? {
+              ...previous,
+              tracks: (previous.tracks ?? []).filter((item) => item.id !== song.id),
+              trackCount: Math.max(0, (previous.trackCount ?? 1) - 1)
+            }
+          : previous
+      )
+      toast(`已从歌单移除《${song.name}》`, 'success')
+    } catch (cause) {
+      toast(cause instanceof Error ? cause.message : '移除失败', 'error')
+    }
+  }
+
+  const openEdit = (): void => {
+    if (!playlist) return
+    setEditName(playlist.name)
+    setEditDesc(playlist.description ?? '')
+    setEditTags(playlist.tags ?? '')
+    setConfirmDelete(false)
+    setEditOpen(true)
+  }
+
+  const removePlaylist = async (): Promise<void> => {
+    if (!confirmDelete) {
+      setConfirmDelete(true)
+      return
+    }
+    if (deleting) return
+    setDeleting(true)
+    try {
+      await api.playlist.remove(id)
+      invalidatePlaylist(id)
+      await useAuthStore.getState().refresh()
+      setEditOpen(false)
+      toast('歌单已删除', 'success')
+      navigate({ page: 'home' })
+    } catch (cause) {
+      toast(cause instanceof Error ? cause.message : '删除歌单失败', 'error')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const saveEdit = async (): Promise<void> => {
+    if (!playlist || saving) return
+    const value = editName.trim()
+    if (!value) {
+      toast('歌单名称不能为空', 'error')
+      return
+    }
+    setSaving(true)
+    try {
+      await Promise.all([
+        value !== playlist.name ? api.playlist.rename(id, value) : Promise.resolve(),
+        editDesc !== (playlist.description ?? '')
+          ? api.playlist.updateDesc(id, editDesc)
+          : Promise.resolve(),
+        editTags !== (playlist.tags ?? '') ? api.playlist.updateTags(id, editTags) : Promise.resolve()
+      ])
+      setPlaylist({ ...playlist, name: value, description: editDesc, tags: editTags })
+      invalidatePlaylist(id)
+      await useAuthStore.getState().refresh()
+      setEditOpen(false)
+      toast('歌单信息已更新', 'success')
+    } catch (cause) {
+      toast(cause instanceof Error ? cause.message : '保存失败', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   useEffect(() => {
     let alive = true
@@ -165,6 +298,30 @@ export function PlaylistPage({ id }: { id: number }): React.JSX.Element {
                 <Download size={13} />
                 全部下载
               </button>
+              {!isFavorites &&
+                (isOwner ? (
+                  <button
+                    onClick={openEdit}
+                    className="glass-soft flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-white/40 px-3.5 py-2 text-[11px] text-black/60 transition-all duration-200 hover:bg-white/30 hover:text-black sm:px-4 sm:text-[11.5px]"
+                  >
+                    <Pencil size={13} />
+                    编辑歌单
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => void toggleSubscribe()}
+                    disabled={subBusy}
+                    className={cn(
+                      'glass-soft flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-2 text-[11px] transition-all duration-200 active:scale-95 sm:px-4 sm:text-[11.5px]',
+                      subscribed
+                        ? 'border-brand/30 text-brand'
+                        : 'border-white/40 text-black/60 hover:bg-white/30 hover:text-black'
+                    )}
+                  >
+                    <Heart size={13} fill={subscribed ? 'currentColor' : 'none'} />
+                    {subscribed ? '已收藏' : '收藏歌单'}
+                  </button>
+                ))}
             </div>
           </div>
         </div>
@@ -177,9 +334,124 @@ export function PlaylistPage({ id }: { id: number }): React.JSX.Element {
             <span className="hidden text-right sm:block">时长</span>
             <span />
           </div>
-          <TrackList songs={tracks} />
+          <TrackList
+            songs={tracks}
+            onRemove={
+              isOwner && !isFavorites ? (song) => void removeTrack(song) : undefined
+            }
+          />
         </div>
       </div>
+
+      <AnimatePresence>
+        {editOpen && (
+          <motion.div
+            key="edit-playlist"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="fixed inset-0 z-[85] flex items-center justify-center p-4"
+          >
+            <div
+              className="absolute inset-0 bg-slate-900/20 backdrop-blur-xl"
+              onClick={() => setEditOpen(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.98 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              role="dialog"
+              aria-modal="true"
+              aria-label="编辑歌单"
+              className="glass-strong relative w-full max-w-[460px] rounded-[24px] border border-white/55 p-4 shadow-[0_40px_120px_-40px_rgba(0,0,0,0.45)]"
+            >
+              <header className="flex items-start gap-3 px-1">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-white/45 bg-white/25 text-brand">
+                  <Pencil size={15} strokeWidth={1.8} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[14px] font-medium text-black/85">编辑歌单</div>
+                  <div className="mt-0.5 text-[11px] text-black/40">修改会同步到网易云账号</div>
+                </div>
+                <button
+                  onClick={() => setEditOpen(false)}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-black/35 transition-all duration-200 hover:bg-white/35 hover:text-black active:scale-90"
+                  aria-label="关闭"
+                >
+                  <X size={16} />
+                </button>
+              </header>
+
+              <div className="mt-4 space-y-2.5">
+                <label className="block">
+                  <span className="mb-1 block px-1 text-[10.5px] text-black/40">名称</span>
+                  <input
+                    value={editName}
+                    onChange={(event) => setEditName(event.target.value)}
+                    maxLength={40}
+                    className="w-full rounded-[12px] border border-white/45 bg-white/20 px-3 py-2 text-[12.5px] text-black/85 outline-none placeholder:text-black/25 focus:border-white/70"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block px-1 text-[10.5px] text-black/40">简介</span>
+                  <textarea
+                    value={editDesc}
+                    onChange={(event) => setEditDesc(event.target.value)}
+                    rows={3}
+                    maxLength={1000}
+                    className="w-full resize-none rounded-[12px] border border-white/45 bg-white/20 px-3 py-2 text-[12.5px] leading-relaxed text-black/85 outline-none placeholder:text-black/25 focus:border-white/70"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block px-1 text-[10.5px] text-black/40">
+                    标签（用逗号分隔）
+                  </span>
+                  <input
+                    value={editTags}
+                    onChange={(event) => setEditTags(event.target.value)}
+                    placeholder="流行, 华语, 夜晚"
+                    className="w-full rounded-[12px] border border-white/45 bg-white/20 px-3 py-2 text-[12.5px] text-black/85 outline-none placeholder:text-black/25 focus:border-white/70"
+                  />
+                </label>
+              </div>
+
+              <div className="mt-4 flex items-center gap-2">
+                <button
+                  onClick={() => void removePlaylist()}
+                  disabled={deleting}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] transition-all duration-200 active:scale-95 disabled:opacity-50',
+                    confirmDelete
+                      ? 'border-brand/40 bg-brand/10 text-brand'
+                      : 'border-white/35 text-black/40 hover:bg-white/25 hover:text-brand'
+                  )}
+                >
+                  {deleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                  {confirmDelete ? '确认删除' : '删除歌单'}
+                </button>
+                <div className="ml-auto flex items-center gap-2">
+                  <button
+                    onClick={() => setEditOpen(false)}
+                    className="rounded-full px-3.5 py-1.5 text-[11.5px] text-black/45 transition-colors hover:bg-white/25 hover:text-black"
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={() => void saveEdit()}
+                    disabled={saving || !editName.trim()}
+                    className="flex items-center gap-1.5 rounded-full bg-brand px-4 py-1.5 text-[11.5px] font-medium text-white transition-all duration-200 active:scale-95 disabled:opacity-40"
+                  >
+                    {saving && <Loader2 size={12} className="animate-spin" />}
+                    {saving ? '保存中…' : '保存'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

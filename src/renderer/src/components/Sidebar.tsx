@@ -54,7 +54,6 @@ export function Sidebar(): React.JSX.Element {
   const navigate = useUiStore((state) => state.navigate)
   const route = useUiStore((state) => state.route)
   const setLoginOpen = useUiStore((state) => state.setLoginOpen)
-  const toast = useUiStore((state) => state.toast)
   const { loggedIn, profile, playlists } = useAuthStore()
 
   return (
@@ -116,7 +115,7 @@ export function Sidebar(): React.JSX.Element {
         <button
           onClick={() => {
             if (!loggedIn) setLoginOpen(true)
-            else toast('在网易云客户端创建歌单后会自动同步', 'info')
+            else useUiStore.getState().setCreatePlaylistOpen(true)
           }}
           className="flex h-6 w-6 items-center justify-center rounded-md text-black/30 transition-all duration-200 hover:bg-black/[0.06] hover:text-black active:scale-90"
           aria-label="新建歌单"

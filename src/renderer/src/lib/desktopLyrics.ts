@@ -21,6 +21,7 @@ export function useDesktopLyrics(): void {
   const backgroundOpacity = useSettingsStore(
     (state) => state.settings?.desktopLyricsBackgroundOpacity ?? 42
   )
+  const lyricOffset = useSettingsStore((state) => state.settings?.lyricOffset ?? 0)
 
   const current = usePlayerStore((state) => state.current)
   const playing = usePlayerStore((state) => state.playing)
@@ -39,7 +40,11 @@ export function useDesktopLyrics(): void {
     api.song
       .lyric(songId)
       .then((result) => {
-        if (alive) setLines(parseLyric(result.lrc ?? '', result.tlyric ?? ''))
+        if (alive) {
+          setLines(
+            parseLyric(result.lrc ?? '', result.tlyric ?? '', lyricOffset / 1000, result.yrc ?? '')
+          )
+        }
       })
       .catch(() => {
         if (alive) setLines([])
@@ -47,7 +52,7 @@ export function useDesktopLyrics(): void {
     return () => {
       alive = false
     }
-  }, [enabled, songId])
+  }, [enabled, songId, lyricOffset])
 
   useEffect(() => {
     void api.lyrics?.setVisible(enabled)

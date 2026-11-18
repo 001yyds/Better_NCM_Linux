@@ -15,6 +15,7 @@ import type {
 import type {
   AlbumDetail,
   ArtistDetail,
+  Banner,
   Comment,
   CommentFloorPage,
   CommentPage,
@@ -331,8 +332,13 @@ class NeteaseClient {
       .filter((song): song is Song => !!song?.id)
   }
 
-  async userRecent(limit = 100): Promise<Song[]> {
-    const result = await this.request('pc/recent/listen/list', { limit, total: true })
+  async userRecent(limit = 100, uid?: number): Promise<Song[]> {
+    const result = await this.request('pc/recent/listen/list', {
+      limit,
+      offset: 0,
+      total: true,
+      ...(uid ? { uid } : {})
+    })
     this.assertOk(result, '最近播放加载失败')
     const resources = (result.data?.resources as Json[]) ?? []
     return resources
@@ -461,9 +467,10 @@ class NeteaseClient {
   async mvUrl(id: number, resolution = 1080): Promise<MvUrlResult> {
     const result = await this.request('song/enhance/play/mv/url', { id, r: resolution })
     const data = (result.data as Record<string, unknown> | undefined) ?? {}
+    const url = typeof data.url === 'string' ? data.url.replace(/^http:\/\//, 'https://') : null
     return {
       id,
-      url: (data.url as string) ?? null,
+      url,
       r: data.r as number | undefined,
       size: data.size as number | undefined,
       fee: data.fee as number | undefined,
@@ -528,6 +535,18 @@ class NeteaseClient {
     }))
   }
 
+  async playlistDynamic(
+    id: number
+  ): Promise<{ subscribed: boolean; playCount?: number; commentCount?: number }> {
+    const result = await this.request('playlist/detail/dynamic', { id })
+    this.assertOk(result, '歌单信息加载失败')
+    return {
+      subscribed: !!result.subscribed,
+      playCount: result.playCount as number | undefined,
+      commentCount: result.commentCount as number | undefined
+    }
+  }
+
   async playlistCatalogue(): Promise<PlaylistCatalogue> {
     const result = await this.request('playlist/catalogue', {})
     this.assertOk(result, '歌单分类加载失败')
@@ -572,6 +591,15 @@ class NeteaseClient {
     })
     this.assertOk(result, '创建歌单失败')
     return (result.playlist as Playlist) ?? null
+  }
+
+  async playlistRemove(id: number): Promise<void> {
+    this.ensure()
+    const result = await this.request('playlist/delete', {
+      pid: id,
+      csrf_token: this.csrfToken()
+    })
+    this.assertOk(result, '删除歌单失败')
   }
 
   async playlistRename(id: number, name: string): Promise<void> {
@@ -626,6 +654,18 @@ class NeteaseClient {
       csrf_token: this.csrfToken()
     })
     this.assertOk(result, '删除歌曲失败')
+  }
+
+  async songInfo(id: number): Promise<Song | null> {
+    const result = await this.request('v3/song/detail', { c: JSON.stringify([{ id }]) })
+    this.assertOk(result, '歌曲信息加载失败')
+    return ((result.songs as Song[]) ?? [])[0] ?? null
+  }
+
+  async banners(): Promise<Banner[]> {
+    const result = await this.request('v2/banner/get', { clientType: 'pc' })
+    this.assertOk(result, 'Banner 加载失败')
+    return (result.banners as Banner[]) ?? []
   }
 
   async songUrl(id: number, preferred: Quality): Promise<SongUrlResult> {
@@ -764,11 +804,11 @@ class NeteaseClient {
   async lyric(id: number): Promise<LyricResult> {
     const result = await this.request('song/lyric/v1', {
       id,
-      cp: true,
-      tv: 1,
-      lv: 1,
-      rv: 1,
-      kv: 1
+      lv: -1,
+      tv: -1,
+      rv: -1,
+      yv: -1,
+      kv: -1
     })
     return {
       lrc: (result.lrc?.lyric as string) ?? '',

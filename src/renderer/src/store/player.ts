@@ -18,6 +18,7 @@ interface PlayerState {
   muted: boolean
   mode: PlayMode
   quality: Quality
+  rate: number
   trial: boolean
   play: (song: Song, queue?: Song[]) => void
   playQueue: (queue: Song[], index: number) => void
@@ -30,6 +31,7 @@ interface PlayerState {
   setMode: (mode: PlayMode) => void
   cycleMode: () => void
   setQuality: (quality: Quality) => void
+  setRate: (rate: number) => void
   addToQueue: (songs: Song[]) => void
   removeFromQueue: (index: number) => void
   clearQueue: () => void
@@ -162,6 +164,7 @@ async function start(song: Song, autoplay: boolean): Promise<void> {
     if (local) {
       audio.src = local
       audio.volume = usePlayerStore.getState().muted ? 0 : usePlayerStore.getState().volume
+      audio.playbackRate = usePlayerStore.getState().rate
       usePlayerStore.setState({ trial: false })
       if (!autoplay) {
         usePlayerStore.setState({ loading: false })
@@ -189,6 +192,7 @@ async function start(song: Song, autoplay: boolean): Promise<void> {
     }
     audio.src = audioUrl(song.id, result.upstream, result.level, result.type, result.size)
     audio.volume = usePlayerStore.getState().muted ? 0 : usePlayerStore.getState().volume
+    audio.playbackRate = usePlayerStore.getState().rate
     usePlayerStore.setState({ trial: result.trial })
 
     if (!result.trial && result.upstream) {
@@ -229,6 +233,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   muted: false,
   mode: 'repeat',
   quality: 'exhigh',
+  rate: 1,
   trial: false,
 
   play: (song, list) => {
@@ -389,6 +394,13 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const wasPlaying = !audio.paused
     pendingSeek = audio.currentTime
     void start(current, wasPlaying)
+  },
+
+  setRate: (rate) => {
+    const value = Math.min(2, Math.max(0.5, rate))
+    audio.playbackRate = value
+    set({ rate: value })
+    void useSettingsStore.getState().patch({ playbackRate: value })
   },
 
   addToQueue: (songs) => {

@@ -9,6 +9,7 @@ import { useAuthStore } from '../store/auth'
 import { useContentStore } from '../store/content'
 import { usePlayerStore } from '../store/player'
 import { useUiStore, type Route } from '../store/ui'
+import { BannerStrip } from '../components/BannerStrip'
 import { Cover } from '../components/Cover'
 import { MVCard } from '../components/MVCard'
 import { PlaylistCard } from '../components/PlaylistCard'
@@ -86,6 +87,8 @@ export function Home(): React.JSX.Element {
           </button>
         )}
       </header>
+
+      <BannerStrip />
 
       <div className="relative">
         {loading && !playlists.length ? (

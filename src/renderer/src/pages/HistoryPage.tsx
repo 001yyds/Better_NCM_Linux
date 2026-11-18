@@ -36,7 +36,7 @@ export function HistoryPage(): React.JSX.Element {
       try {
         const result =
           tab === 'recent'
-            ? await api.user.recent(200)
+            ? await api.user.recent(200, profile.userId)
             : await api.user.playRecord(profile.userId, tab === 'week' ? 1 : 0)
         if (alive) setSongs(result)
       } catch (cause) {

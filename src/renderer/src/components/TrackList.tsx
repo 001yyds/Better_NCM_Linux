@@ -1,4 +1,4 @@
-import { Download, Heart, ListPlus, MessageSquare, Play } from 'lucide-react'
+import { Download, FolderPlus, Heart, ListPlus, MessageSquare, Play, Trash2 } from 'lucide-react'
 import type { Song } from '../../../shared/types'
 import { downloadSong } from '../lib/actions'
 import { songArtists, songCover, songDuration } from '../lib/api'
@@ -16,6 +16,8 @@ interface TrackListProps {
   showAlbum?: boolean
   showIndex?: boolean
   dense?: boolean
+  /** 歌单详情页传入后，每行显示「从歌单移除」 */
+  onRemove?: (song: Song, index: number) => void
 }
 
 function RowAction({
@@ -46,7 +48,13 @@ function RowAction({
   )
 }
 
-export function TrackList({ songs, showAlbum = true, showIndex = true, dense }: TrackListProps): React.JSX.Element {
+export function TrackList({
+  songs,
+  showAlbum = true,
+  showIndex = true,
+  dense,
+  onRemove
+}: TrackListProps): React.JSX.Element {
   const currentId = usePlayerStore((state) => state.current?.id)
   const playing = usePlayerStore((state) => state.playing)
   const liked = useLikesStore((state) => state.liked)
@@ -144,9 +152,20 @@ export function TrackList({ songs, showAlbum = true, showIndex = true, dense }: 
               <RowAction title="评论" onClick={() => useUiStore.getState().openComments(song)}>
                 <MessageSquare size={14} />
               </RowAction>
+              <RowAction
+                title="添加到歌单"
+                onClick={() => useUiStore.getState().openPlaylistPicker(song)}
+              >
+                <FolderPlus size={14} />
+              </RowAction>
               <RowAction title="加入播放队列" onClick={() => addToQueue([song])}>
                 <ListPlus size={14} />
               </RowAction>
+              {onRemove && (
+                <RowAction title="从歌单移除" onClick={() => onRemove(song, index)}>
+                  <Trash2 size={14} />
+                </RowAction>
+              )}
             </div>
           </div>
         )

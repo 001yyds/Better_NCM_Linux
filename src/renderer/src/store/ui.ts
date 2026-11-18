@@ -51,6 +51,11 @@ interface UiState {
   commentsFor: Song | null
   openComments: (song: Song) => void
   closeComments: () => void
+  playlistPickerFor: Song | null
+  openPlaylistPicker: (song: Song) => void
+  closePlaylistPicker: () => void
+  createPlaylistOpen: boolean
+  setCreatePlaylistOpen: (open: boolean) => void
   toasts: Toast[]
   toast: (message: string, kind?: Toast['kind']) => void
   dismissToast: (id: number) => void
@@ -88,6 +93,11 @@ export const useUiStore = create<UiState>((set, get) => ({
   commentsFor: null,
   openComments: (commentsFor) => set({ commentsFor }),
   closeComments: () => set({ commentsFor: null }),
+  playlistPickerFor: null,
+  openPlaylistPicker: (playlistPickerFor) => set({ playlistPickerFor }),
+  closePlaylistPicker: () => set({ playlistPickerFor: null }),
+  createPlaylistOpen: false,
+  setCreatePlaylistOpen: (createPlaylistOpen) => set({ createPlaylistOpen }),
   toasts: [],
   toast: (message, kind = 'info') => {
     const id = (toastSequence += 1)

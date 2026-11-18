@@ -5,6 +5,7 @@ import {
   ListMusic,
   ListOrdered,
   Loader2,
+  Moon,
   Pause,
   Play,
   Repeat,
@@ -22,6 +23,7 @@ import { cn } from '../lib/cn'
 import { formatClock } from '../lib/format'
 import { useLikesStore } from '../store/likes'
 import { usePlayerStore, type PlayMode } from '../store/player'
+import { useSleepStore } from '../store/sleep'
 import { useUiStore } from '../store/ui'
 import { Cover } from './Cover'
 import { QualityMenu } from './QualityMenu'
@@ -67,6 +69,9 @@ export function PlayerBar(): React.JSX.Element {
   const setLyricsOpen = useUiStore((state) => state.setLyricsOpen)
 
   const liked = useLikesStore((state) => state.liked)
+  const sleepEndAt = useSleepStore((state) => state.endAt)
+  const sleepRemaining = useSleepStore((state) => state.remaining)
+  const cancelSleep = useSleepStore((state) => state.cancel)
   const [scrub, setScrub] = useState<number | null>(null)
 
   const total = duration || (current ? songDuration(current) / 1000 : 0)
@@ -194,6 +199,16 @@ export function PlayerBar(): React.JSX.Element {
         </div>
 
         <div className="flex items-center justify-end gap-2.5 xl:gap-3">
+          {sleepEndAt && (
+            <button
+              onClick={() => cancelSleep()}
+              title="点击取消定时停止"
+              className="glass-soft flex items-center gap-1 rounded-full border border-white/45 px-2 py-1 text-[10px] text-black/50 transition-all duration-200 hover:bg-white/35 hover:text-black active:scale-95"
+            >
+              <Moon size={10} />
+              <span className="tabular">{formatClock(sleepRemaining)}</span>
+            </button>
+          )}
           <QualityMenu />
           <div className="flex items-center gap-1">
             <button

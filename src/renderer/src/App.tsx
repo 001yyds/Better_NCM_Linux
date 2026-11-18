@@ -2,6 +2,8 @@ import { useEffect } from 'react'
 import { MotionConfig } from 'framer-motion'
 import { Ambient } from './components/Ambient'
 import { CommentsPanel } from './components/CommentsPanel'
+import { CreatePlaylistModal } from './components/CreatePlaylistModal'
+import { PlaylistPicker } from './components/PlaylistPicker'
 import { LoginModal } from './components/LoginModal'
 import { NowPlaying } from './components/NowPlaying'
 import { PageRouter } from './components/PageRouter'
@@ -108,6 +110,8 @@ export default function App(): React.JSX.Element {
     >
       {isMobile() ? <MobileApp /> : <DesktopApp />}
       <CommentsPanel />
+      <PlaylistPicker />
+      <CreatePlaylistModal />
     </MotionConfig>
   )
 }

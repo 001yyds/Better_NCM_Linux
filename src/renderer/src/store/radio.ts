@@ -25,7 +25,9 @@ function ensureSubscription(): void {
     const radio = useRadioStore.getState()
     if (!radio.active) return
 
-    if (state.current && radio.ids.length && !radio.ids.includes(state.current.id)) {
+    // playQueue 会先改 queue/index、再改 current，中间态不能误判为「切到了别的歌」
+    const settled = !!state.current && state.queue[state.index]?.id === state.current.id
+    if (settled && radio.ids.length && !radio.ids.includes(state.current!.id)) {
       radio.stop()
       return
     }

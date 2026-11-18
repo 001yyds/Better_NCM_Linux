@@ -5,6 +5,7 @@ import type {
   Comment,
   DesktopLyricTheme,
   MediaWarmPayload,
+  MvDownloadRequest,
   Quality,
   Settings,
   Song
@@ -33,15 +34,17 @@ const api = {
     followers: (uid: number, offset = 0, limit = 30) =>
       invoke('user:followers', uid, offset, limit),
     playRecord: (uid: number, type: 0 | 1 = 1) => invoke('user:play-record', uid, type),
-    recent: (limit = 100) => invoke('user:recent', limit)
+    recent: (limit = 100, uid?: number) => invoke('user:recent', limit, uid)
   },
   playlist: {
     detail: (id: number) => invoke('playlist:detail', id),
+    dynamic: (id: number) => invoke('playlist:dynamic', id),
     catalogue: () => invoke('playlist:catalogue'),
     highquality: (params: HighQualityParams = {}) => invoke('playlist:highquality', params),
     subscribe: (id: number, subscribed: boolean) =>
       invoke('playlist:subscribe', id, subscribed),
     create: (name: string) => invoke('playlist:create', name),
+    remove: (id: number) => invoke('playlist:remove', id),
     rename: (id: number, name: string) => invoke('playlist:rename', id, name),
     updateDesc: (id: number, description: string) =>
       invoke('playlist:update-desc', id, description),
@@ -68,6 +71,7 @@ const api = {
     all: (query: MVQuery = {}) => invoke('mv:all', query),
     exclusive: (limit = 20, offset = 0) => invoke('mv:exclusive', limit, offset),
     url: (id: number, resolution = 1080) => invoke('mv:url', id, resolution),
+    download: (request: MvDownloadRequest) => invoke('mv:download', request),
     subscribe: (id: number, subscribed: boolean) => invoke('mv:subscribe', id, subscribed),
     sublist: (offset = 0, limit = 50) => invoke('mv:sublist', offset, limit)
   },
@@ -78,7 +82,11 @@ const api = {
   song: {
     url: (id: number, level: Quality) => invoke('song:url', id, level),
     lyric: (id: number) => invoke('song:lyric', id),
-    like: (id: number, like: boolean) => invoke('song:like', id, like)
+    like: (id: number, like: boolean) => invoke('song:like', id, like),
+    detail: (id: number) => invoke('song:detail', id)
+  },
+  banner: {
+    list: () => invoke('banner:list')
   },
   comment: {
     list: (songId: number, offset = 0, limit = 20) =>
@@ -152,6 +160,12 @@ const api = {
         callback(payload)
       ipcRenderer.on('download:progress', handler)
       return () => ipcRenderer.removeListener('download:progress', handler)
+    },
+    onMvProgress: (callback: (payload: { id: number; received: number; total: number }) => void) => {
+      const handler = (_event: unknown, payload: { id: number; received: number; total: number }): void =>
+        callback(payload)
+      ipcRenderer.on('mv:progress', handler)
+      return () => ipcRenderer.removeListener('mv:progress', handler)
     },
     onPlayerCommand: (callback: (command: string) => void) => {
       const handler = (_event: unknown, command: string): void => callback(command)

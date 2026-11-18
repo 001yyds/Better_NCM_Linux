@@ -18,6 +18,8 @@ function defaults(): Settings {
     downloadDir: join(app.getPath('music'), 'BetterNCM'),
     downloads: [],
     lyricFontSize: 22,
+    lyricOffset: 0,
+    playbackRate: 1,
     desktopLyrics: false,
     desktopLyricsLocked: false,
     desktopLyricsFontSize: 30,

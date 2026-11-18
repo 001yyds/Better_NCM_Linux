@@ -28,6 +28,7 @@ import { usePlayerStore, type PlayMode } from '../store/player'
 import { useSettingsStore } from '../store/settings'
 import { useUiStore } from '../store/ui'
 import { Cover } from '../components/Cover'
+import { KaraokeText } from '../components/KaraokeText'
 import { QualityMenu } from '../components/QualityMenu'
 import { Slider } from '../components/Slider'
 
@@ -62,6 +63,7 @@ export function MobileNowPlaying(): React.JSX.Element {
   const liked = useLikesStore((state) => state.liked)
   const quality = useSettingsStore((state) => state.settings?.quality ?? 'exhigh')
   const lyricFontSize = useSettingsStore((state) => state.settings?.lyricFontSize ?? 22)
+  const lyricOffset = useSettingsStore((state) => state.settings?.lyricOffset ?? 0)
 
   const [lines, setLines] = useState<LyricLine[]>([])
   const [scrub, setScrub] = useState<number | null>(null)
@@ -83,13 +85,15 @@ export function MobileNowPlaying(): React.JSX.Element {
     api.song
       .lyric(current.id)
       .then((result) => {
-        if (alive) setLines(parseLyric(result.lrc, result.tlyric))
+        if (alive) {
+          setLines(parseLyric(result.lrc, result.tlyric, lyricOffset / 1000, result.yrc))
+        }
       })
       .catch(() => undefined)
     return () => {
       alive = false
     }
-  }, [current?.id])
+  }, [current?.id, lyricOffset])
 
   const active = useMemo(() => activeLineIndex(lines, time), [lines, time])
   const activeText = active >= 0 ? lines[active]?.text : ''
@@ -230,7 +234,11 @@ export function MobileNowPlaying(): React.JSX.Element {
                           className={cn('origin-left transition-all duration-300', isActive ? 'scale-[1.03] font-semibold' : '')}
                           style={{ fontSize: isActive ? lyricSize : Math.round(lyricSize * 0.82) }}
                         >
-                          {line.text}
+                          {isActive && line.words?.length ? (
+                            <KaraokeText line={line} time={time} dim={0.32} />
+                          ) : (
+                            line.text
+                          )}
                         </div>
                         {line.translation && (
                           <div

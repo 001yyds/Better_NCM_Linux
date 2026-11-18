@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Heart, Loader2, Play } from 'lucide-react'
+import { Download, Heart, Loader2, Play } from 'lucide-react'
 import type { MV } from '../../../shared/types'
 import { api, coverUrl } from '../lib/api'
 import { cn } from '../lib/cn'
@@ -37,7 +37,38 @@ export function MVPage({
   const [resolution, setResolution] = useState(1080)
   const [subscribed, setSubscribed] = useState(!!subed)
   const [subscribing, setSubscribing] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null)
   const [related, setRelated] = useState<MV[]>([])
+
+  useEffect(
+    () =>
+      api.events.onMvProgress((payload) => {
+        if (payload.id !== id) return
+        if (payload.total > 0) setDownloadProgress(payload.received / payload.total)
+      }),
+    [id]
+  )
+
+  const download = async (): Promise<void> => {
+    if (downloading) return
+    setDownloading(true)
+    setDownloadProgress(0)
+    try {
+      const result = await api.mv.download({
+        id,
+        name: title ?? `MV-${id}`,
+        artist,
+        resolution
+      })
+      toast(`MV 已保存到 ${result.path}`, 'success')
+    } catch (cause) {
+      toast(cause instanceof Error ? cause.message : 'MV 下载失败', 'error')
+    } finally {
+      setDownloading(false)
+      setDownloadProgress(null)
+    }
+  }
 
   useEffect(() => {
     let alive = true
@@ -196,6 +227,18 @@ export function MVPage({
                 </button>
               ))}
             </div>
+            <button
+              onClick={() => void download()}
+              disabled={downloading}
+              className="glass-soft flex items-center gap-1.5 rounded-full border border-white/40 px-3.5 py-1.5 text-[11px] text-black/55 transition-all duration-200 hover:bg-white/30 hover:text-black active:scale-95 disabled:opacity-60"
+            >
+              {downloading ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+              {downloading
+                ? downloadProgress != null
+                  ? `${Math.round(downloadProgress * 100)}%`
+                  : '准备中…'
+                : '下载'}
+            </button>
             <button
               onClick={() => void toggleSubscribe()}
               disabled={subscribing}

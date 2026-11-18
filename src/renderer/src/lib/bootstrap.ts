@@ -12,7 +12,11 @@ export function useAppBootstrap(): void {
       await useSettingsStore.getState().load()
       const settings = useSettingsStore.getState().settings
       if (settings) {
-        usePlayerStore.setState({ volume: settings.volume, quality: settings.quality })
+        usePlayerStore.setState({
+          volume: settings.volume,
+          quality: settings.quality,
+          rate: settings.playbackRate ?? 1
+        })
       }
       await useAuthStore.getState().init()
       void useLikesStore.getState().load()

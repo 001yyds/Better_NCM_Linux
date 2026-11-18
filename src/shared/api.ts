@@ -1,6 +1,7 @@
 import type {
   AlbumDetail,
   AppInfo,
+  Banner,
   ArtistDetail,
   ArtistIntroduction,
   Comment,
@@ -12,6 +13,8 @@ import type {
   LyricResult,
   MediaWarmPayload,
   MV,
+  MvDownloadRequest,
+  MvDownloadResult,
   MvUrlResult,
   Playlist,
   PlaylistCatalogue,
@@ -48,7 +51,7 @@ export interface SearchResult {
   userCount?: number
 }
 
-export type SearchType = 1 | 10 | 100 | 1000 | 1002 | 1004
+export type SearchType = 1 | 10 | 100 | 1000 | 1002 | 1004 | 1006
 
 export interface ArtistPageData {
   artist: ArtistDetail
@@ -145,14 +148,16 @@ export interface NcmApi {
     /** 听歌排行：type 1 = 最近一周，0 = 所有时间 */
     playRecord(uid: number, type?: 0 | 1): Promise<Song[]>
     /** 最近播放（PC 端） */
-    recent(limit?: number): Promise<Song[]>
+    recent(limit?: number, uid?: number): Promise<Song[]>
   }
   playlist: {
     detail(id: number): Promise<Playlist | null>
+    dynamic(id: number): Promise<{ subscribed: boolean; playCount?: number; commentCount?: number }>
     catalogue(): Promise<PlaylistCatalogue>
     highquality(params?: HighQualityParams): Promise<HighQualityData>
     subscribe(id: number, subscribed: boolean): Promise<void>
     create(name: string): Promise<Playlist | null>
+    remove(id: number): Promise<void>
     rename(id: number, name: string): Promise<void>
     updateDesc(id: number, description: string): Promise<void>
     updateTags(id: number, tags: string): Promise<void>
@@ -177,6 +182,7 @@ export interface NcmApi {
     all(query?: MVQuery): Promise<MVListData>
     exclusive(limit?: number, offset?: number): Promise<MV[]>
     url(id: number, resolution?: number): Promise<MvUrlResult>
+    download(request: MvDownloadRequest): Promise<MvDownloadResult>
     subscribe(id: number, subscribed: boolean): Promise<void>
     sublist(offset?: number, limit?: number): Promise<MV[]>
   }
@@ -190,6 +196,10 @@ export interface NcmApi {
     url(id: number, level: Quality): Promise<SongUrlResult>
     lyric(id: number): Promise<LyricResult>
     like(id: number, like: boolean): Promise<void>
+    detail(id: number): Promise<Song | null>
+  }
+  banner: {
+    list(): Promise<Banner[]>
   }
   comment: {
     list(songId: number, offset?: number, limit?: number): Promise<CommentPage>
@@ -247,6 +257,7 @@ export interface NcmApi {
   }
   events: {
     onDownloadProgress(callback: (payload: { id: number; received: number; total: number }) => void): () => void
+    onMvProgress(callback: (payload: { id: number; received: number; total: number }) => void): () => void
     onPlayerCommand(callback: (command: string) => void): () => void
   }
 }

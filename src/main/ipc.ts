@@ -4,7 +4,15 @@ import { createWriteStream } from 'node:fs'
 import { mkdir, stat, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { HighQualityParams, MVQuery, SearchType } from '../shared/api'
-import type { DownloadRecord, MediaWarmPayload, Quality, Settings, Song } from '../shared/types'
+import type {
+  DownloadRecord,
+  MediaWarmPayload,
+  MvDownloadRequest,
+  MvDownloadResult,
+  Quality,
+  Settings,
+  Song
+} from '../shared/types'
 import {
   setDesktopLyricsFont,
   setDesktopLyricsLocked,
@@ -99,6 +107,56 @@ async function downloadSong(sender: Electron.WebContents, song: Song, level: Qua
   return record
 }
 
+async function downloadMv(
+  sender: Electron.WebContents,
+  request: MvDownloadRequest
+): Promise<MvDownloadResult> {
+  const result = await netease.mvUrl(request.id, request.resolution ?? 720)
+  if (!result.url) throw new Error('该 MV 暂无可下载源')
+
+  const dir = getSettings().downloadDir
+  await mkdir(dir, { recursive: true })
+  const base =
+    safeName(`${request.artist ? `${request.artist} - ` : ''}${request.name}`) || `MV-${request.id}`
+  const target = await uniquePath(dir, base, 'mp4')
+
+  const response = await fetch(result.url, {
+    headers: { 'User-Agent': UA, Referer: 'https://music.163.com/' }
+  })
+  if (!response.ok || !response.body) throw new Error('MV 下载失败，来源无响应')
+
+  const total = Number(response.headers.get('content-length') ?? 0) || result.size || 0
+  const reader = response.body.getReader()
+  const sink = createWriteStream(target)
+  let received = 0
+
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    const chunk = Buffer.from(value)
+    received += chunk.byteLength
+    if (!sink.write(chunk)) await once(sink, 'drain')
+    if (total) sender.send('mv:progress', { id: request.id, received, total })
+  }
+  sink.end()
+  await once(sink, 'finish')
+
+  addDownload({
+    id: -request.id,
+    kind: 'mv',
+    name: request.name,
+    artist: request.artist ?? '',
+    album: 'MV',
+    cover: '',
+    level: 'standard',
+    path: target,
+    size: received,
+    createdAt: Date.now()
+  })
+
+  return { path: target, size: received }
+}
+
 export function registerIpc(): void {
   ipcMain.handle('auth:qr:create', () => netease.qrCreate())
   ipcMain.handle('auth:qr:check', (_event, key: string) => netease.qrCheck(key))
@@ -132,8 +190,11 @@ export function registerIpc(): void {
   ipcMain.handle('user:play-record', (_event, uid: number, type: 0 | 1 = 1) =>
     netease.userPlayRecord(uid, type)
   )
-  ipcMain.handle('user:recent', (_event, limit = 100) => netease.userRecent(limit))
+  ipcMain.handle('user:recent', (_event, limit = 100, uid?: number) =>
+    netease.userRecent(limit, uid)
+  )
   ipcMain.handle('playlist:detail', (_event, id: number) => netease.playlistDetail(id))
+  ipcMain.handle('playlist:dynamic', (_event, id: number) => netease.playlistDynamic(id))
   ipcMain.handle('playlist:catalogue', () => netease.playlistCatalogue())
   ipcMain.handle('playlist:highquality', (_event, params: HighQualityParams = {}) =>
     netease.playlistHighQuality(params)
@@ -142,6 +203,7 @@ export function registerIpc(): void {
     netease.playlistSubscribe(id, subscribed)
   )
   ipcMain.handle('playlist:create', (_event, name: string) => netease.playlistCreate(name))
+  ipcMain.handle('playlist:remove', (_event, id: number) => netease.playlistRemove(id))
   ipcMain.handle('playlist:rename', (_event, id: number, name: string) =>
     netease.playlistRename(id, name)
   )
@@ -192,6 +254,9 @@ export function registerIpc(): void {
   ipcMain.handle('mv:sublist', (_event, offset = 0, limit = 50) =>
     netease.mvSublist(offset, limit)
   )
+  ipcMain.handle('mv:download', (event, request: MvDownloadRequest) =>
+    downloadMv(event.sender, request)
+  )
   ipcMain.handle('radio:next', () => netease.radioNext())
   ipcMain.handle('radio:trash', (_event, songId: number, time = 0) =>
     netease.radioTrash(songId, time)
@@ -199,6 +264,8 @@ export function registerIpc(): void {
   ipcMain.handle('song:url', (_event, id: number, level: Quality) => netease.songUrl(id, level))
   ipcMain.handle('song:lyric', (_event, id: number) => netease.lyric(id))
   ipcMain.handle('song:like', (_event, id: number, like: boolean) => netease.like(id, like))
+  ipcMain.handle('song:detail', (_event, id: number) => netease.songInfo(id))
+  ipcMain.handle('banner:list', () => netease.banners())
   ipcMain.handle('comment:list', (_event, songId: number, offset = 0, limit = 20) =>
     netease.comments(songId, offset, limit)
   )

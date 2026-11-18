@@ -4,13 +4,16 @@ import {
   ChevronRight,
   Download,
   FolderOpen,
+  Gauge,
   HardDrive,
   Headphones,
   Info,
   LogIn,
   LogOut,
   Monitor,
+  Moon,
   ShieldCheck,
+  Timer,
   Trash2,
   Type,
   UserRound,
@@ -20,13 +23,14 @@ import type { LucideIcon } from 'lucide-react'
 import type { AppInfo, Quality } from '../../../shared/types'
 import { cn } from '../lib/cn'
 import { coverUrl } from '../lib/api'
-import { formatBytes } from '../lib/format'
+import { formatBytes, formatClock } from '../lib/format'
 import { isMobile } from '../lib/platform'
 import { clearPlaylistCache } from '../lib/playlistCache'
 import { useAuthStore } from '../store/auth'
 import { useLikesStore } from '../store/likes'
 import { usePlayerStore } from '../store/player'
 import { useSettingsStore } from '../store/settings'
+import { useSleepStore } from '../store/sleep'
 import { useUiStore } from '../store/ui'
 import { Slider } from '../components/Slider'
 import { DesktopLyricsPanel } from '../components/DesktopLyricsPanel'
@@ -110,15 +114,23 @@ export function SettingsPage(): React.JSX.Element {
   const profile = useAuthStore((state) => state.profile)
   const quality = usePlayerStore((state) => state.quality)
   const volume = usePlayerStore((state) => state.volume)
+  const rate = usePlayerStore((state) => state.rate)
   const setQuality = usePlayerStore((state) => state.setQuality)
   const setVolume = usePlayerStore((state) => state.setVolume)
+  const setRate = usePlayerStore((state) => state.setRate)
   const setLoginOpen = useUiStore((state) => state.setLoginOpen)
   const toast = useUiStore((state) => state.toast)
+
+  const sleepEndAt = useSleepStore((state) => state.endAt)
+  const sleepRemaining = useSleepStore((state) => state.remaining)
+  const sleepMinutes = useSleepStore((state) => state.minutes)
+  const setSleepTimer = useSleepStore((state) => state.setTimer)
 
   const desktopLyrics = settings?.desktopLyrics ?? false
   const desktopLyricsLocked = settings?.desktopLyricsLocked ?? false
 
   const [lyricSize, setLyricSize] = useState(22)
+  const [lyricOffset, setLyricOffset] = useState(0)
   const [desktopPanelOpen, setDesktopPanelOpen] = useState(false)
   const [cache, setCache] = useState({ audio: 0, images: 0 })
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
@@ -136,6 +148,10 @@ export function SettingsPage(): React.JSX.Element {
   useEffect(() => {
     setLyricSize(settings?.lyricFontSize ?? 22)
   }, [settings?.lyricFontSize])
+
+  useEffect(() => {
+    setLyricOffset(settings?.lyricOffset ?? 0)
+  }, [settings?.lyricOffset])
 
   const downloads = settings?.downloads ?? []
   const downloadSize = downloads.reduce((sum, item) => sum + item.size, 0)
@@ -284,6 +300,101 @@ export function SettingsPage(): React.JSX.Element {
               style={{ fontSize: lyricSize }}
             >
               诸事顺利！
+            </div>
+          </div>
+
+          <div className="px-1 py-3.5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-white/40 bg-white/20 text-black/45">
+                <Gauge size={15} strokeWidth={1.8} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[12.5px] text-black/80">播放速度</div>
+                <div className="mt-0.5 text-[10.5px] text-black/40">{rate.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}×</div>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-1.5 pl-11">
+              {[0.75, 1, 1.25, 1.5, 2].map((value) => (
+                <button
+                  key={value}
+                  onClick={() => setRate(value)}
+                  className={cn(
+                    'rounded-full border px-2.5 py-1 text-[11px] transition-all duration-200 active:scale-95',
+                    Math.abs(rate - value) < 0.001
+                      ? 'glass-pill border-white/60 text-black'
+                      : 'border-white/30 bg-white/10 text-black/50 hover:bg-white/25 hover:text-black'
+                  )}
+                >
+                  {value}×
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="px-1 py-3.5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-white/40 bg-white/20 text-black/45">
+                <Type size={15} strokeWidth={1.8} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[12.5px] text-black/80">歌词偏移</div>
+                <div className="mt-0.5 text-[10.5px] text-black/40">
+                  {lyricOffset === 0
+                    ? '与音频同步'
+                    : `歌词${lyricOffset > 0 ? '延后' : '提前'} ${(Math.abs(lyricOffset) / 1000).toFixed(1)} 秒`}
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 pl-11">
+              <Slider
+                value={lyricOffset + 3000}
+                max={6000}
+                onChange={(value) => setLyricOffset(Math.round(value) - 3000)}
+                onCommit={(value) =>
+                  void useSettingsStore.getState().patch({ lyricOffset: Math.round(value) - 3000 })
+                }
+                className="w-full"
+              />
+              <div className="mt-1 flex justify-between text-[9.5px] text-black/30">
+                <span>提前 3s</span>
+                <span>0</span>
+                <span>延后 3s</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-1 py-3.5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-white/40 bg-white/20 text-black/45">
+                <Moon size={15} strokeWidth={1.8} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[12.5px] text-black/80">定时停止</div>
+                <div className="mt-0.5 flex items-center gap-1.5 text-[10.5px] text-black/40">
+                  <Timer size={10} />
+                  {sleepEndAt ? `还剩 ${formatClock(sleepRemaining)}` : '到点自动暂停播放'}
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-1.5 pl-11">
+              {[0, 15, 30, 45, 60, 90].map((minutes) => (
+                <button
+                  key={minutes}
+                  onClick={() => {
+                    setSleepTimer(minutes || null)
+                    if (minutes) toast(`将在 ${minutes} 分钟后暂停播放`, 'success')
+                    else toast('已取消定时停止', 'info')
+                  }}
+                  className={cn(
+                    'rounded-full border px-2.5 py-1 text-[11px] transition-all duration-200 active:scale-95',
+                    sleepMinutes === minutes
+                      ? 'glass-pill border-white/60 text-black'
+                      : 'border-white/30 bg-white/10 text-black/50 hover:bg-white/25 hover:text-black'
+                  )}
+                >
+                  {minutes ? `${minutes} 分钟` : '关闭'}
+                </button>
+              ))}
             </div>
           </div>
 

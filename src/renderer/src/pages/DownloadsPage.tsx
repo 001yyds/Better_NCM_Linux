@@ -225,7 +225,9 @@ export function DownloadsPage(): React.JSX.Element {
                   <div className="truncate text-[11px] text-black/45">{item.artist}</div>
                 </div>
                 <div className="hidden truncate text-[11.5px] text-black/45 min-[1040px]:block">{item.album || '—'}</div>
-                <div className="text-[10.5px] text-brand/80">{QUALITY_LABEL[item.level] ?? item.level}</div>
+                <div className="text-[10.5px] text-brand/80">
+                  {item.kind === 'mv' ? 'MV' : (QUALITY_LABEL[item.level] ?? item.level)}
+                </div>
                 <div className="tabular text-right text-[10.5px] text-black/35">{formatBytes(item.size)}</div>
                 <div className="tabular hidden text-right text-[10px] text-black/25 min-[1040px]:block">
                   {new Date(item.createdAt).toLocaleDateString('zh-CN')}

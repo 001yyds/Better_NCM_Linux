@@ -11,10 +11,11 @@ import { MVCard } from '../components/MVCard'
 import { PlaylistCard } from '../components/PlaylistCard'
 import { TrackList } from '../components/TrackList'
 
-type Tab = 'songs' | 'artists' | 'albums' | 'playlists' | 'mvs' | 'users'
+type Tab = 'songs' | 'lyrics' | 'artists' | 'albums' | 'playlists' | 'mvs' | 'users'
 
 interface SearchPayload {
   songs: Song[]
+  lyrics: Song[]
   playlists: Playlist[]
   artists: NonNullable<SearchResult['artists']>
   albums: AlbumDetail[]
@@ -71,17 +72,26 @@ export function SearchPage({ initialKeyword }: { initialKeyword?: string }): Rea
     setLoading(true)
     const timer = window.setTimeout(async () => {
       try {
-        const [songResult, playlistResult, artistResult, albumResult, mvResult, userResult] =
-          await Promise.all([
-            api.search.query(query, 1),
-            api.search.query(query, 1000),
-            api.search.query(query, 100),
-            api.search.query(query, 10),
-            api.search.query(query, 1004),
-            api.search.query(query, 1002)
-          ])
+        const [
+          songResult,
+          lyricResult,
+          playlistResult,
+          artistResult,
+          albumResult,
+          mvResult,
+          userResult
+        ] = await Promise.all([
+          api.search.query(query, 1),
+          api.search.query(query, 1006),
+          api.search.query(query, 1000),
+          api.search.query(query, 100),
+          api.search.query(query, 10),
+          api.search.query(query, 1004),
+          api.search.query(query, 1002)
+        ])
         const next: SearchPayload = {
           songs: songResult.songs ?? [],
+          lyrics: lyricResult.songs ?? [],
           playlists: playlistResult.playlists ?? [],
           artists: artistResult.artists ?? [],
           albums: albumResult.albums ?? [],
@@ -89,6 +99,7 @@ export function SearchPage({ initialKeyword }: { initialKeyword?: string }): Rea
           users: userResult.userprofiles ?? [],
           counts: {
             songs: songResult.songCount ?? songResult.songs?.length ?? 0,
+            lyrics: lyricResult.songCount ?? lyricResult.songs?.length ?? 0,
             playlists: playlistResult.playlistCount ?? playlistResult.playlists?.length ?? 0,
             artists: artistResult.artistCount ?? artistResult.artists?.length ?? 0,
             albums: albumResult.albumCount ?? albumResult.albums?.length ?? 0,
@@ -126,6 +137,7 @@ export function SearchPage({ initialKeyword }: { initialKeyword?: string }): Rea
 
   const tabs: { key: Tab; label: string; count: number }[] = [
     { key: 'songs', label: '单曲', count: payload?.counts.songs ?? 0 },
+    { key: 'lyrics', label: '歌词', count: payload?.counts.lyrics ?? 0 },
     { key: 'artists', label: '歌手', count: payload?.counts.artists ?? 0 },
     { key: 'albums', label: '专辑', count: payload?.counts.albums ?? 0 },
     { key: 'playlists', label: '歌单', count: payload?.counts.playlists ?? 0 },
@@ -253,6 +265,16 @@ export function SearchPage({ initialKeyword }: { initialKeyword?: string }): Rea
                 <TrackList songs={payload.songs} />
               ) : (
                 <p className="py-16 text-center text-[12px] text-black/35">没有找到相关单曲</p>
+              )}
+            </div>
+          )}
+
+          {keyword && searched && payload && tab === 'lyrics' && (
+            <div className="glass-panel rounded-[22px] border border-white/40 p-2">
+              {payload.lyrics.length ? (
+                <TrackList songs={payload.lyrics} />
+              ) : (
+                <p className="py-16 text-center text-[12px] text-black/35">没有找到歌词匹配的歌曲</p>
               )}
             </div>
           )}

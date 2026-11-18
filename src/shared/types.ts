@@ -33,8 +33,10 @@ export interface Playlist {
   trackCount?: number
   playCount?: number
   description?: string
+  tags?: string
   creator?: { userId: number; nickname: string; avatarUrl?: string }
   subscribed?: boolean
+  userId?: number
   updateFrequency?: string
   specialType?: number
   tracks?: Song[]
@@ -53,6 +55,8 @@ export interface Profile {
 
 export interface DownloadRecord {
   id: number
+  /** song = 歌曲；mv = 音乐视频（id 存负数避免与歌曲 id 冲突） */
+  kind?: 'song' | 'mv'
   name: string
   artist: string
   album: string
@@ -76,6 +80,10 @@ export interface Settings {
   downloadDir: string
   downloads: DownloadRecord[]
   lyricFontSize: number
+  /** 歌词时间轴偏移，单位毫秒，正数表示歌词延后 */
+  lyricOffset: number
+  /** 播放速度倍率 */
+  playbackRate: number
   /** 桌面歌词（仅桌面端，Wayland 下走 layer-shell） */
   desktopLyrics: boolean
   desktopLyricsLocked: boolean
@@ -218,6 +226,28 @@ export interface PlaylistCatalogue {
 export interface ArtistIntroduction {
   ti?: string
   txt?: string
+}
+
+export interface Banner {
+  imageUrl: string
+  targetId?: number
+  targetType?: number
+  url?: string
+  title?: string
+  typeTitle?: string
+  encodeId?: string
+}
+
+export interface MvDownloadRequest {
+  id: number
+  name: string
+  artist?: string
+  resolution?: number
+}
+
+export interface MvDownloadResult {
+  path: string
+  size: number
 }
 
 export interface MvUrlResult {
