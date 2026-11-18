@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { UserPlus, UserCheck, Play, Sparkles } from 'lucide-react'
+import { UserCheck, UserPlus, Play, Sparkles } from 'lucide-react'
 import type { ArtistAlbumsData, ArtistIntroData, ArtistPageData } from '../../../shared/api'
 import type { ArtistDetail, AlbumDetail, MV } from '../../../shared/types'
 import { api, coverUrl } from '../lib/api'
@@ -58,9 +58,9 @@ export function ArtistPage({
 
   const [data, setData] = useState<ArtistPageData | null>(null)
   const [error, setError] = useState(false)
-  const [tab, setTab] = useState<Tab>('songs')
   const [followed, setFollowed] = useState(false)
   const [following, setFollowing] = useState(false)
+  const [tab, setTab] = useState<Tab>('songs')
   const [albums, setAlbums] = useState<AlbumDetail[] | null>(null)
   const [albumMore, setAlbumMore] = useState(false)
   const [mvs, setMvs] = useState<MV[] | null>(null)
@@ -209,7 +209,7 @@ export function ArtistPage({
               <h1 className="truncate text-[24px] font-semibold leading-tight tracking-[-0.02em] text-black/90 sm:text-[30px]">
                 {name}
               </h1>
-              {followed && <UserCheck size={16} className="shrink-0 text-brand" />}
+              {artist.followed && <UserCheck size={16} className="shrink-0 text-brand" />}
             </div>
             {artist.alias?.length ? (
               <p className="mt-1 truncate text-[11.5px] text-black/40">{artist.alias.join(' / ')}</p>

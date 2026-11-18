@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Download, Heart, Loader2, Play } from 'lucide-react'
+import { Download, Loader2, Play } from 'lucide-react'
 import type { MV } from '../../../shared/types'
 import { api, coverUrl } from '../lib/api'
 import { cn } from '../lib/cn'
-import { useAuthStore } from '../store/auth'
 import { useUiStore } from '../store/ui'
 import { MVCard } from '../components/MVCard'
 
@@ -15,19 +14,15 @@ export function MVPage({
   cover,
   artist,
   artistId,
-  subed
 }: {
   id: number
   title?: string
   cover?: string
   artist?: string
   artistId?: number
-  subed?: boolean
 }): React.JSX.Element {
   const navigate = useUiStore((state) => state.navigate)
   const toast = useUiStore((state) => state.toast)
-  const setLoginOpen = useUiStore((state) => state.setLoginOpen)
-  const loggedIn = useAuthStore((state) => state.loggedIn)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const resumeRef = useRef(0)
@@ -35,8 +30,6 @@ export function MVPage({
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
   const [resolution, setResolution] = useState(1080)
-  const [subscribed, setSubscribed] = useState(!!subed)
-  const [subscribing, setSubscribing] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null)
   const [related, setRelated] = useState<MV[]>([])
@@ -112,26 +105,6 @@ export function MVPage({
       alive = false
     }
   }, [artistId, id])
-
-  const toggleSubscribe = async (): Promise<void> => {
-    if (!loggedIn) {
-      setLoginOpen(true)
-      return
-    }
-    if (subscribing) return
-    setSubscribing(true)
-    const next = !subscribed
-    setSubscribed(next)
-    try {
-      await api.mv.subscribe(id, next)
-      toast(next ? '已收藏 MV' : '已取消收藏', 'success')
-    } catch (cause) {
-      setSubscribed(!next)
-      toast(cause instanceof Error ? cause.message : '操作失败', 'error')
-    } finally {
-      setSubscribing(false)
-    }
-  }
 
   const changeResolution = (value: number): void => {
     if (value === resolution) return
@@ -239,19 +212,7 @@ export function MVPage({
                   : '准备中…'
                 : '下载'}
             </button>
-            <button
-              onClick={() => void toggleSubscribe()}
-              disabled={subscribing}
-              className={cn(
-                'flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[11px] transition-all duration-200 active:scale-95',
-                subscribed
-                  ? 'border-brand/30 bg-brand/10 text-brand'
-                  : 'glass-soft border-white/40 text-black/55 hover:bg-white/30 hover:text-black'
-              )}
-            >
-              <Heart size={13} fill={subscribed ? 'currentColor' : 'none'} />
-              {subscribed ? '已收藏' : '收藏'}
-            </button>
+
           </div>
         </div>
 

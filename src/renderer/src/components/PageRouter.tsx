@@ -34,7 +34,6 @@ export function PageRouter({ route }: { route: Route }): React.JSX.Element {
           cover={route.cover}
           artist={route.artist}
           artistId={route.artistId}
-          subed={route.subed}
         />
       )
     case 'user':

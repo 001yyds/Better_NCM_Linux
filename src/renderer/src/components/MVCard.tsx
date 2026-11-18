@@ -21,8 +21,7 @@ export function MVCard({ mv, className }: { mv: MV; className?: string }): React
           title: mv.name,
           cover: mv.cover ?? '',
           artist: mv.artistName ?? mv.artists?.map((item) => item.name).join(' / ') ?? '',
-          artistId: mv.artistId,
-          subed: mv.subed
+          artistId: mv.artistId
         })
       }
       className={`glass-tile group block w-full rounded-[20px] border border-white/40 p-2 text-left ${className ?? ''}`}

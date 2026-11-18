@@ -133,6 +133,14 @@ export function HistoryPage(): React.JSX.Element {
           <div className="flex flex-col items-center justify-center py-20 text-black/30">
             <History size={32} strokeWidth={1.2} />
             <p className="mt-3 text-[12px]">还没有播放记录</p>
+            {tab === 'recent' && (
+              <button
+                onClick={() => setTab('week')}
+                className="mt-3 rounded-full border border-white/45 bg-white/20 px-3.5 py-1.5 text-[11px] text-black/50 transition-all duration-200 hover:bg-white/35 hover:text-black active:scale-95"
+              >
+                查看本周最热
+              </button>
+            )}
           </div>
         )}
       </div>

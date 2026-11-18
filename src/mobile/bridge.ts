@@ -377,6 +377,45 @@ class MobileNetease {
     return this.cookies.get('__csrf') ?? ''
   }
 
+  /** 部分官方 /api 接口接受带 Cookie 的普通 GET（例如 artist/sub） */
+  private async apiGet<T = Json>(path: string, payload: Json = {}): Promise<T> {
+    this.ensure()
+    const params = new URLSearchParams()
+    for (const [key, value] of Object.entries(payload)) params.set(key, String(value))
+    params.set('csrf_token', this.csrfToken())
+    const cookie = [...this.cookies].map(([key, value]) => `${key}=${value}`).join('; ')
+    let response
+    try {
+      response = await CapacitorHttp.request({
+        url: `https://music.163.com/api/${path}?${params.toString()}`,
+        method: 'GET',
+        headers: {
+          'User-Agent': UA,
+          Referer: 'https://music.163.com/',
+          Cookie: cookie
+        },
+        connectTimeout: 15000,
+        readTimeout: 20000
+      })
+    } catch {
+      throw new Error('网络连接失败，请检查网络')
+    }
+    this.absorbHeaders(response.headers as Record<string, string>)
+    this.persist()
+    if (response.status < 200 || response.status >= 400) {
+      throw new Error(`接口返回异常 (${response.status})`)
+    }
+    let data: unknown = response.data
+    if (typeof data === 'string') {
+      try {
+        data = JSON.parse(data)
+      } catch {
+        throw new Error(`接口返回异常 (${response.status})`)
+      }
+    }
+    return data as T
+  }
+
   private async request<T = Json>(path: string, payload: Json = {}): Promise<T> {
     this.ensure()
     let response
@@ -651,12 +690,16 @@ class MobileNetease {
 
   async artistSubscribe(id: number, subscribed: boolean): Promise<void> {
     this.ensure()
-    const result = await this.request(subscribed ? 'artist/sub' : 'artist/unsub', {
-      artistId: id,
-      artistIds: `[${id}]`,
-      csrf_token: this.csrfToken()
-    })
-    this.assertOk(result, subscribed ? '关注歌手失败' : '取消关注失败')
+    if (!subscribed) {
+      const result = await this.request('artist/unsub', {
+        artistIds: `[${id}]`,
+        csrf_token: this.csrfToken()
+      })
+      this.assertOk(result, '取消关注失败')
+      return
+    }
+    const result = await this.apiGet('artist/sub', { artistId: id })
+    this.assertOk(result, '关注歌手失败')
   }
 
   async artistSublist(
@@ -935,9 +978,14 @@ class MobileNetease {
 
   async playlistUpdateTags(id: number, tags: string): Promise<void> {
     this.ensure()
+    const normalized = tags
+      .split(/[,，;；]/)
+      .map((tag) => tag.trim())
+      .filter(Boolean)
+      .join(';')
     const result = await this.request('playlist/tags/update', {
       id,
-      tags,
+      tags: normalized,
       csrf_token: this.csrfToken()
     })
     this.assertOk(result, '歌单标签更新失败')

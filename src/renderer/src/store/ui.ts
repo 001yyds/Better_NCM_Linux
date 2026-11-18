@@ -14,7 +14,6 @@ export type Route =
       cover?: string
       artist?: string
       artistId?: number
-      subed?: boolean
     }
   | { page: 'user'; id: number; title?: string }
   | { page: 'search'; keyword?: string }
